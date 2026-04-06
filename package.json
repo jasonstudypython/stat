@@ -1,0 +1,22 @@
+{
+  "name": "lecture",
+  "version": "1.0.0",
+  "description": "Interactive lecture site draft",
+  "scripts": {
+    "dev": "next dev",
+    "check:korean": "node scripts/check-korean-encoding.js",
+    "build": "next build",
+    "start": "next start"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "next": "^16.1.7",
+    "plotly.js-dist-min": "^3.4.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-plotly.js": "^2.6.0"
+  }
+}
