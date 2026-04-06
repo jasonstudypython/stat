@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { useDeferredValue, useMemo, useRef, useState } from "react";
 
 const Plot = dynamic(() => import("react-plotly.js"), {
   ssr: false,
@@ -943,9 +943,11 @@ export default function BasicStatsRegressionPage() {
   const [hoveredPrediction, setHoveredPrediction] = useState(null);
   const [logisticApplied, setLogisticApplied] = useState(false);
   const plotRevision = useRef(0);
+  const deferredProgressValue = useDeferredValue(progressValue);
 
   const activeScene = scenes[viewKey];
-  const progress = progressValue / 100;
+  const immediateProgress = progressValue / 100;
+  const progress = deferredProgressValue / 100;
   const basePlot =
     viewKey === "logistic" ? activeScene.plot(progress, logisticApplied) : activeScene.plot(progress);
   const visibilityForView = traceVisibility[viewKey] || {};
@@ -959,8 +961,12 @@ export default function BasicStatsRegressionPage() {
       };
     }),
   };
+  const immediatePoint =
+    viewKey === "logistic"
+      ? activeScene.pointAt(immediateProgress, logisticApplied)
+      : activeScene.pointAt(immediateProgress);
   const currentPoint =
-    viewKey === "multiple" && hoveredPrediction ? hoveredPrediction : plot.currentPoint;
+    viewKey === "multiple" && hoveredPrediction ? hoveredPrediction : immediatePoint;
 
   if (viewKey === "multiple") {
     const predictionTraceIndex = plot.data.length - 1;
@@ -1089,6 +1095,7 @@ export default function BasicStatsRegressionPage() {
               max="100"
               step="1"
               value={progressValue}
+              onInput={(event) => setProgressValue(Number(event.target.value))}
               onChange={(event) => setProgressValue(Number(event.target.value))}
             />
           </section>
