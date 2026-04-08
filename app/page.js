@@ -200,7 +200,7 @@ export default function HomePage() {
         <LinkCard
           href="https://www.jamovi.org/"
           title="jamovi"
-          description="기초 통계 분석용 GUI 소프트웨어"
+          description="통계 분석용 GUI 소프트웨어"
           external
         >
           <JamoviCardVisual />
