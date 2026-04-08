@@ -1341,14 +1341,20 @@ a {
 
 .rr-rotating-page .rr-metrics {
   margin-top: 18px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
 .rr-rotating-page .rr-metrics article {
   border-radius: 22px;
+  min-width: 0;
 }
 
 .rr-rotating-page .rr-metrics strong {
   color: var(--text);
+}
+
+.rr-rotating-page .rr-metrics article:nth-child(4) span:first-child {
+  display: none;
 }
 
 .rr-rotating-page .rr-stepper {
@@ -1625,8 +1631,8 @@ a {
 .lab-index-home:active {
   transform: translateY(0);
   box-shadow:
-    inset 4px 4px 8px #d1d5db,
-    inset -4px -4px 8px #ffffff;
+    inset 4px 4px 8px rgba(167, 176, 190, 0.6),
+    inset -2px -2px 4px rgba(255, 255, 255, 0.18);
 }
 
 .lab-index-subtitle {
@@ -1741,8 +1747,8 @@ a {
 .lab-index-card:active {
   transform: translateY(-2px) scale(0.988);
   box-shadow:
-    inset 4px 4px 8px #d1d5db,
-    inset -4px -4px 8px #ffffff;
+    inset 4px 4px 8px rgba(167, 176, 190, 0.6),
+    inset -2px -2px 4px rgba(255, 255, 255, 0.16);
 }
 
 .lab-index-card-glow {
@@ -1862,8 +1868,8 @@ a {
 .lab-index-card:active .lab-index-card-number,
 .lab-index-card:active .lab-index-card-arrow-shell {
   box-shadow:
-    inset 4px 4px 8px #d1d5db,
-    inset -4px -4px 8px #ffffff;
+    inset 4px 4px 8px rgba(167, 176, 190, 0.6),
+    inset -2px -2px 4px rgba(255, 255, 255, 0.14);
 }
 
 .lab-index-card.is-blue {
@@ -3809,6 +3815,7 @@ a {
   border-radius: 18px;
   border: 1px solid rgba(207, 219, 235, 0.9);
   background: rgba(248, 250, 252, 0.96);
+  position: relative;
 }
 
 .reg1intro-ols-metric-cell span {
@@ -3821,6 +3828,20 @@ a {
   color: #102f53;
   font-size: 1.22rem;
   font-weight: 900;
+}
+
+.reg1intro-ols-metric-cell.is-f-summary > span:first-child {
+  visibility: hidden;
+}
+
+.reg1intro-ols-metric-cell.is-f-summary::before {
+  content: attr(data-f-label);
+  position: absolute;
+  top: 0.85rem;
+  left: 0.95rem;
+  color: #5f789b;
+  font-size: 0.84rem;
+  font-weight: 800;
 }
 
 .reg1intro-mini-plot {
@@ -4348,6 +4369,51 @@ a {
 
 .modlab-layout {
   grid-template-columns: minmax(0, 0.68fr) minmax(600px, 0.68fr);
+}
+
+.modlab-header-actions,
+.lab-header-action-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.modlab-header-actions .secondary-button,
+.lab-header-action-stack .secondary-button,
+.lab-header-actions .secondary-button {
+  min-width: 148px;
+  justify-content: center;
+  border: 1px solid rgba(17, 45, 78, 0.1);
+  background: #f9f7f7;
+  box-shadow:
+    7px 7px 14px #d9dde3,
+    -7px -7px 14px #ffffff;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    background-color 180ms ease,
+      color 180ms ease;
+}
+
+.modlab-header-actions .secondary-button:hover,
+.lab-header-action-stack .secondary-button:hover,
+.lab-header-actions .secondary-button:hover {
+  transform: translateY(-2px);
+  background: #112d4e;
+  color: #f9f7f7;
+  box-shadow:
+    10px 10px 18px #d1d5db,
+      -8px -8px 16px #ffffff;
+}
+
+.modlab-header-actions .secondary-button:active,
+.lab-header-action-stack .secondary-button:active,
+.lab-header-actions .secondary-button:active {
+  transform: translateY(0);
+  box-shadow:
+    inset 4px 4px 8px rgba(167, 176, 190, 0.6),
+    inset -2px -2px 4px rgba(255, 255, 255, 0.14);
 }
 
 .multireg2-stage {

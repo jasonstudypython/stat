@@ -916,9 +916,11 @@ export default function MeanDifferenceDistributionPage() {
           <p className="eyebrow">GRAPH</p>
           <h1>집단간 평균 차이의 표집 분포</h1>
         </div>
-        <Link className="secondary-button regswitch-home-button" href="/lab">
+        <div className="lab-header-action-stack">
+          <Link className="secondary-button regswitch-home-button" href="/lab">
           메인으로
-        </Link>
+          </Link>
+        </div>
       </header>
 
       <section className="tf-layout tf-layout-two-up">

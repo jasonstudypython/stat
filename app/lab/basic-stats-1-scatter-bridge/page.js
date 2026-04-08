@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { downloadCsv } from "../_shared/csv";
 
 function createSeededRandom(seed) {
   let state = seed >>> 0;
@@ -197,9 +198,23 @@ export default function BasicStatsScatterBridgePage() {
           <p className="eyebrow">GRAPH</p>
           <h1>단순 회귀분석</h1>
         </div>
-        <Link className="secondary-button regswitch-home-button" href="/lab">
+        <div className="lab-header-action-stack">
+          <Link className="secondary-button regswitch-home-button" href="/lab">
           메인으로
-        </Link>
+          </Link>
+          <button
+            type="button"
+            className="secondary-button regswitch-home-button"
+            onClick={() =>
+              downloadCsv("basic-stats-1-scatter-bridge-jamovi.csv", points, [
+                { label: "study_hours", value: (row) => row.x.toFixed(6) },
+                { label: "score", value: (row) => row.y.toFixed(6) },
+              ])
+            }
+          >
+            CSV 다운로드
+          </button>
+        </div>
       </header>
 
       <section className="regswitch-layout">

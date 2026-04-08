@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import rawHeightData from "../../../data_mdis_height.json";
+import { downloadCsv } from "../_shared/csv";
 
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
 
@@ -535,9 +536,32 @@ export default function KoreanHeightDistributionPage() {
           <p className="eyebrow">GRAPH</p>
           <h1>대한민국 성인 키 분포</h1>
         </div>
-        <Link className="secondary-button regswitch-home-button" href="/lab">
+        <div className="lab-header-action-stack">
+          <Link className="secondary-button regswitch-home-button" href="/lab">
           메인으로
-        </Link>
+          </Link>
+          <button
+            type="button"
+            className="secondary-button regswitch-home-button"
+            onClick={() =>
+              downloadCsv(
+                "korean-height-distribution-jamovi.csv",
+                rawHeightData.map((row) => ({
+                  sex_code: row.sex === "남" ? 0 : 1,
+                  sex_label: row.sex,
+                  height_cm: Number(row.height),
+                })),
+                [
+                  { label: "sex_code", value: "sex_code" },
+                  { label: "sex_label", value: "sex_label" },
+                  { label: "height_cm", value: (row) => row.height_cm.toFixed(6) },
+                ],
+              )
+            }
+          >
+            CSV 다운로드
+          </button>
+        </div>
       </header>
 
       <section className="regswitch-layout heightdist-layout">

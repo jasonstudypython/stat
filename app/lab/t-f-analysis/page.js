@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import fatData from "../../../data_mdis_fat.json";
+import { downloadCsv } from "../_shared/csv";
 
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
 
@@ -83,6 +84,27 @@ function compressFValue(value) {
   return Math.log10(1 + Math.max(0, value));
 }
 
+function compressSignedTValue(value) {
+  const sign = value < 0 ? -1 : 1;
+  return sign * Math.log10(1 + Math.abs(value));
+}
+
+function buildCompressedTTicks(observedT, expandedMax) {
+  const positiveReferenceTicks = [0, 1, 2, 4, 8];
+  const magnitudeTicks = [16, 32, 64, 128, 256];
+  const signedMagnitudeTicks = magnitudeTicks.flatMap((value) => [-value, value]);
+  const observedRounded =
+    Math.abs(observedT) >= 10 ? Math.round(observedT) : Number(observedT.toFixed(1));
+
+  return Array.from(
+    new Set(
+      [...positiveReferenceTicks, ...positiveReferenceTicks.map((value) => -value), ...signedMagnitudeTicks, observedRounded]
+        .map((value) => Number(value.toFixed(6)))
+        .filter((value) => value >= -expandedMax && value <= expandedMax)
+    )
+  ).sort((a, b) => a - b);
+}
+
 const ALPHA_OPTIONS = [
   { value: 0.1, label: "10%" },
   { value: 0.05, label: "5%" },
@@ -99,7 +121,7 @@ export default function TFAnalysisPage() {
   const [alpha, setAlpha] = useState(0.05);
   const [analysisMode, setAnalysisMode] = useState("t");
   const [showStatisticScale, setShowStatisticScale] = useState(false);
-  const [showJitter, setShowJitter] = useState(true);
+  const [showJitter, setShowJitter] = useState(false);
 
   const maleFat = useMemo(() => fatData.male.map(Number), []);
   const femaleFat = useMemo(() => fatData.female.map(Number), []);
@@ -134,8 +156,9 @@ export default function TFAnalysisPage() {
 
   const tAxisRange = useMemo(() => {
     if (!showStatisticScale) return [-5, 5];
-    const padding = Math.max(6, Math.abs(stats.tValue) * 0.08);
-    return [Math.min(-5, stats.tValue - padding), Math.max(5, stats.tValue + padding)];
+    const expandedMax = Math.max(5, Math.abs(stats.tValue) * 1.08);
+    const paddedMax = compressSignedTValue(expandedMax) + 0.45;
+    return [-paddedMax, paddedMax];
   }, [showStatisticScale, stats.tValue]);
 
   const fAxisRange = useMemo(() => {
@@ -191,15 +214,20 @@ export default function TFAnalysisPage() {
   }, [femaleFat, maleFat, showJitter]);
 
   const tPlot = useMemo(() => {
-    const xValues = Array.from({ length: 1000 }, (_, index) => -5 + (10 * index) / 999);
+    const curveMax = Math.max(5, criticalT * 2.6);
+    const xValues = Array.from({ length: 1200 }, (_, index) => -curveMax + ((curveMax * 2) * index) / 1199);
     const yValues = xValues.map((x) => (1 / Math.sqrt(2 * Math.PI)) * Math.exp(-0.5 * x * x));
+    const mappedXValues = xValues.map((x) => (showStatisticScale ? compressSignedTValue(x) : x));
+    const mappedNegativeCriticalT = showStatisticScale ? compressSignedTValue(-criticalT) : -criticalT;
+    const mappedCriticalT = showStatisticScale ? compressSignedTValue(criticalT) : criticalT;
+    const mappedObservedT = showStatisticScale ? compressSignedTValue(stats.tValue) : stats.tValue;
 
     return {
       traces: [
         {
           type: "scatter",
           mode: "lines",
-          x: xValues,
+          x: mappedXValues,
           y: yValues,
           line: { color: "#3f72af", width: 3 },
           hovertemplate: "t=%{x:.2f}<br>밀도=%{y:.3f}<extra></extra>",
@@ -208,7 +236,7 @@ export default function TFAnalysisPage() {
         {
           type: "scatter",
           mode: "lines",
-          x: xValues.filter((x) => x <= -criticalT),
+          x: mappedXValues.filter((_, index) => xValues[index] <= -criticalT),
           y: yValues.filter((_, index) => xValues[index] <= -criticalT),
           fill: "tozeroy",
           fillcolor: "rgba(248,118,104,0.34)",
@@ -219,7 +247,7 @@ export default function TFAnalysisPage() {
         {
           type: "scatter",
           mode: "lines",
-          x: xValues.filter((x) => x >= criticalT),
+          x: mappedXValues.filter((_, index) => xValues[index] >= criticalT),
           y: yValues.filter((_, index) => xValues[index] >= criticalT),
           fill: "tozeroy",
           fillcolor: "rgba(248,118,104,0.34)",
@@ -229,26 +257,28 @@ export default function TFAnalysisPage() {
         },
       ],
       shapes: [
-        { type: "line", x0: -criticalT, x1: -criticalT, y0: 0, y1: 0.7, line: { color: "#ef4444", width: 2, dash: "dash" } },
-        { type: "line", x0: criticalT, x1: criticalT, y0: 0, y1: 0.7, line: { color: "#ef4444", width: 2, dash: "dash" } },
-        { type: "line", x0: stats.tValue, x1: stats.tValue, y0: 0, y1: 0.7, line: { color: "#112d4e", width: 3 } },
+        { type: "line", x0: mappedNegativeCriticalT, x1: mappedNegativeCriticalT, y0: 0, y1: 0.7, line: { color: "#ef4444", width: 2, dash: "dash" } },
+        { type: "line", x0: mappedCriticalT, x1: mappedCriticalT, y0: 0, y1: 0.7, line: { color: "#ef4444", width: 2, dash: "dash" } },
+        { type: "line", x0: mappedObservedT, x1: mappedObservedT, y0: 0, y1: 0.7, line: { color: "#112d4e", width: 3 } },
       ],
       annotations: [
-        { x: -criticalT, y: 0.66, text: `-${criticalT.toFixed(2)}`, showarrow: false, font: { size: 12, color: "#ef4444" } },
-        { x: criticalT, y: 0.66, text: `${criticalT.toFixed(2)}`, showarrow: false, font: { size: 12, color: "#ef4444" } },
+        { x: mappedNegativeCriticalT, y: 0.66, text: `-${criticalT.toFixed(2)}`, showarrow: false, font: { size: 12, color: "#ef4444" } },
+        { x: mappedCriticalT, y: 0.66, text: `${criticalT.toFixed(2)}`, showarrow: false, font: { size: 12, color: "#ef4444" } },
         {
-          x: Math.max(tAxisRange[0] + 0.3, Math.min(tAxisRange[1] - 0.3, stats.tValue)),
+          x: Math.max(tAxisRange[0] + 0.2, Math.min(tAxisRange[1] - 0.2, mappedObservedT)),
           y: 0.58,
           text: `관측 t=${stats.tValue.toFixed(2)}`,
           showarrow: false,
-          font: { size: 12, color: "#112d4e" },
-          bgcolor: "rgba(255,255,255,0.92)",
-          bordercolor: "rgba(17,45,78,0.08)",
-          borderpad: 3,
+          font: { size: 16, color: "#112d4e" },
+          bgcolor: "rgba(255,255,255,0.98)",
+          bordercolor: "rgba(17,45,78,0.22)",
+          borderwidth: 1.5,
+          borderpad: 4,
+          visible: showStatisticScale,
         },
       ],
     };
-  }, [criticalT, stats.tValue, tAxisRange]);
+  }, [criticalT, showStatisticScale, stats.tValue, tAxisRange]);
 
   const fPlot = useMemo(() => {
     const xValues = Array.from({ length: 1000 }, (_, index) => 0.001 + (8 * index) / 999);
@@ -338,6 +368,25 @@ export default function TFAnalysisPage() {
     };
   }, [fAxisRange, showStatisticScale, stats.fValue]);
 
+  const tAxisSpec = useMemo(() => {
+    if (!showStatisticScale) {
+      return { range: tAxisRange, tickmode: "auto" };
+    }
+
+    const expandedMax = Math.max(5, Math.abs(stats.tValue) * 1.08);
+    const uniqueTicks = buildCompressedTTicks(stats.tValue, expandedMax);
+
+    return {
+      range: tAxisRange,
+      tickmode: "array",
+      tickvals: uniqueTicks.map((value) => compressSignedTValue(value)),
+      ticktext: uniqueTicks.map((value) => {
+        if (Math.abs(value) >= 10) return `${Number(value.toFixed(0))}`;
+        return `${Number(value.toFixed(1))}`;
+      }),
+    };
+  }, [showStatisticScale, stats.tValue, tAxisRange]);
+
   return (
     <main className="rr-shell tf-shell">
       <header className="rr-header tf-header">
@@ -345,9 +394,31 @@ export default function TFAnalysisPage() {
           <p className="eyebrow">GRAPH</p>
           <h1>t검정과 F검정</h1>
         </div>
-        <Link className="secondary-button regswitch-home-button" href="/lab">
+        <div className="lab-header-action-stack">
+          <Link className="secondary-button regswitch-home-button" href="/lab">
           메인으로
-        </Link>
+          </Link>
+          <button
+            type="button"
+            className="secondary-button regswitch-home-button"
+            onClick={() =>
+              downloadCsv(
+                "t-f-analysis-jamovi.csv",
+                [
+                  ...maleFat.map((value) => ({ sex_code: 0, sex_label: "male", body_fat: value })),
+                  ...femaleFat.map((value) => ({ sex_code: 1, sex_label: "female", body_fat: value })),
+                ],
+                [
+                  { label: "sex_code", value: "sex_code" },
+                  { label: "sex_label", value: "sex_label" },
+                  { label: "body_fat", value: (row) => row.body_fat.toFixed(6) },
+                ],
+              )
+            }
+          >
+            CSV 다운로드
+          </button>
+        </div>
       </header>
 
       <section className="tf-layout tf-layout-two-up">
@@ -562,21 +633,29 @@ export default function TFAnalysisPage() {
                   analysisMode === "t"
                     ? {
                         title: { text: "t 값", standoff: 14 },
-                        range: tAxisRange,
+                        ...tAxisSpec,
                         showgrid: true,
                         gridcolor: "rgba(17,45,78,0.08)",
+                        tickangle: 0,
+                        automargin: true,
                       }
                     : {
                         title: { text: "F 값", standoff: 14 },
                         ...fAxisSpec,
                         showgrid: true,
                         gridcolor: "rgba(17,45,78,0.08)",
+                        tickangle: 0,
+                        automargin: true,
                       },
                 yaxis: {
                   title: { text: "밀도", standoff: 12 },
                   ...(analysisMode === "f" ? { range: [0, 4] } : { range: [0, 0.7] }),
                   showgrid: true,
                   gridcolor: "rgba(17,45,78,0.08)",
+                  showline: true,
+                  linecolor: "#112d4e",
+                  linewidth: 2,
+                  zeroline: false,
                 },
                 uirevision: `tf-dist-${analysisMode}-${alpha}-${showStatisticScale}`,
               }}

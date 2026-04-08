@@ -37,3 +37,13 @@ D:\project\lecture 프로젝트 계속 작업.
 
 현재 내가 바로 요청할 작업:
 - [여기에 현재 요청을 붙여넣기]
+Recent maintenance notes (2026-04):
+- Shared pure stats helpers now live in `D:\project\lecture\app\lab\_shared\stats.js`
+- Shared CSV download helper now lives in `D:\project\lecture\app\lab\_shared\csv.js`
+- Header CSV download buttons are jamovi-oriented and use normal browser download
+- Common header button press styling is controlled by:
+  - `.lab-header-action-stack`
+  - `.lab-header-actions`
+  - `.modlab-header-actions`
+- `t-f-analysis` uses a custom compressed t-axis when `통계량 표시` is on
+- `rotating-regression` metrics row and labels have page-specific CSS coupling

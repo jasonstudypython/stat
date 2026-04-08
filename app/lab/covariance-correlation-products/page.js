@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { downloadCsv } from "../_shared/csv";
 
 const DATASETS = [
   {
@@ -505,9 +506,32 @@ export default function CovarianceCorrelationProductsPage() {
           <p className="eyebrow">GRAPH</p>
           <h1>공분산과 상관계수</h1>
         </div>
-        <Link className="secondary-button regswitch-home-button" href="/lab">
+        <div className="lab-header-action-stack">
+          <Link className="secondary-button regswitch-home-button" href="/lab">
           메인으로
-        </Link>
+          </Link>
+          <button
+            type="button"
+            className="secondary-button regswitch-home-button"
+            onClick={() =>
+              downloadCsv(
+                `covariance-correlation-products-${dataset.id}-jamovi.csv`,
+                dataset.x.map((xValue, index) => ({
+                  dataset_id: dataset.id,
+                  x_value: xValue,
+                  y_value: dataset.y[index],
+                })),
+                [
+                  { label: "dataset_id", value: "dataset_id" },
+                  { label: "x_value", value: (row) => row.x_value.toFixed(6) },
+                  { label: "y_value", value: (row) => row.y_value.toFixed(6) },
+                ],
+              )
+            }
+          >
+            CSV 다운로드
+          </button>
+        </div>
       </header>
 
       <section className="corr-control-row">

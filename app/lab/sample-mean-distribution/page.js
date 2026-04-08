@@ -509,9 +509,11 @@ export default function SampleMeanDistributionPage() {
           <h1>표본평균의 분포</h1>
           <p className="regswitch-formula">반복 표집과 중심극한정리</p>
         </div>
-        <Link className="secondary-button regswitch-home-button" href="/lab">
+        <div className="lab-header-action-stack">
+          <Link className="secondary-button regswitch-home-button" href="/lab">
           메인으로
-        </Link>
+          </Link>
+        </div>
       </header>
 
       <section className="samplemean-content-grid">

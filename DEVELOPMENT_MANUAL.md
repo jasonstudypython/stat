@@ -115,6 +115,15 @@ Basic deploy flow:
 - [scripts/check-korean-encoding.js](D:/project/lecture/scripts/check-korean-encoding.js)
   - scans `app/**/*` and `package.json` for suspicious Korean-encoding corruption patterns
 
+### Shared lab utilities
+
+- [app/lab/_shared/stats.js](D:/project/lecture/app/lab/_shared/stats.js)
+  - shared pure math / stats helpers used by newer lab pages
+  - includes seeded random, normal sampling, matrix solving, formatting helpers
+- [app/lab/_shared/csv.js](D:/project/lecture/app/lab/_shared/csv.js)
+  - shared browser CSV download helper
+  - current convention is to export jamovi-friendly CSV columns
+
 ## 6. Page Implementation Patterns
 
 There are two major rendering styles in this project.
@@ -187,6 +196,16 @@ Used for:
 Files:
 - [exports/gender-moderation-effect-jamovi.csv](D:/project/lecture/exports/gender-moderation-effect-jamovi.csv)
 
+### E. In-app CSV download
+
+Several `/lab` pages now expose a `CSV 다운로드` button in the header.
+
+Current rule:
+- export format should be jamovi-friendly CSV
+- use the shared helper in [app/lab/_shared/csv.js](D:/project/lecture/app/lab/_shared/csv.js)
+- place the button under the right-side `메인으로` button
+- use normal browser download behavior rather than file-system APIs
+
 ## 8. Styling Rules
 
 Global styling is centralized in:
@@ -206,6 +225,16 @@ Common prefixes:
 - `.modlab-*`
 - `.home-*`
 - `.site-footer*`
+
+Shared button-related selectors now also matter:
+- `.lab-header-action-stack`
+- `.lab-header-actions`
+- `.modlab-header-actions`
+
+These selectors provide the common pressed / hover interaction for:
+- `메인으로`
+- `CSV 다운로드`
+- `/lab` index `홈으로`
 
 Recommended approach:
 1. find the page-specific class prefix
@@ -257,7 +286,42 @@ Suggested page shape:
 - footer retained
 - Korean UI copy kept short
 
+If the page has downloadable source data:
+1. create jamovi-friendly row objects
+2. call the shared CSV helper
+3. place a `CSV 다운로드` button in the header action stack
+4. keep the existing `메인으로` button style unchanged
+
 ## 11. Known Project Conventions
+
+- Newer lab pages often treat each card / stage as an independent lecture scene.
+  - avoid over-abstracting card layouts unless the abstraction is clearly stable
+  - shared pure utilities are fine, but page choreography should stay local
+- Minimal shared utility refactoring has already been done.
+  - prefer reusing [app/lab/_shared/stats.js](D:/project/lecture/app/lab/_shared/stats.js)
+  - avoid duplicating new seeded-random or matrix helpers
+- Some pages intentionally use page-specific CSS overrides in `app/globals.css`.
+  - examples:
+    - `t-f-analysis`: compressed t-axis / distribution display tuning
+    - `rotating-regression`: dense metric card row
+    - `gender-moderation-effect`: staged moderation explanation cards / badges
+    - `mediation-effect`, `multiple-regression-collinearity`: shared right-panel table style
+
+## 12. Deploy Checklist
+
+Before pushing to GitHub / Vercel:
+
+1. `git status --short`
+2. confirm no accidental temp files are included
+3. run:
+
+```powershell
+npm.cmd run check:korean
+npm.cmd run build
+```
+
+4. push to `main`
+5. let Vercel Git integration deploy from GitHub
 
 - `/lab` is the graph hub
 - root `/` is a separate landing page, not the lab itself

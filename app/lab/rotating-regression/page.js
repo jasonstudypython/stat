@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { downloadCsv } from "../_shared/csv";
 
 const X_VALUES = [1, 1.5, 2, 2.5, 3];
 const Y_VALUES = [1, 2, 2, 3, 3];
@@ -92,6 +93,7 @@ function residualStats(slope, intercept) {
   const predicted = X_VALUES.map((x) => slope * x + intercept);
   const residuals = Y_VALUES.map((y, index) => y - predicted[index]);
   const squared = residuals.map((value) => value ** 2);
+  const errorSum = residuals.reduce((sum, value) => sum + value, 0);
   const rss = squared.reduce((sum, value) => sum + value, 0);
   const absSum = residuals.reduce((sum, value) => sum + Math.abs(value), 0);
 
@@ -99,6 +101,7 @@ function residualStats(slope, intercept) {
     predicted,
     residuals,
     squared,
+    errorSum,
     rss,
     absSum,
   };
@@ -306,6 +309,7 @@ export default function RotatingRegressionPage() {
   );
   const currentIntercept = optimal.yMean - currentSlope * optimal.xMean;
   const currentStats = residualStats(currentSlope, currentIntercept);
+  const currentErrorSum = normalizeSignedZero(currentStats.errorSum);
   const currentRss = evaluateQuadratic(rssCurve, currentSlope);
   const tangentSlope = normalizeSignedZero(derivativeQuadratic(rssCurve, currentSlope));
   const nearestStage = SLOPE_STATES.reduce((closest, state) => {
@@ -324,9 +328,27 @@ export default function RotatingRegressionPage() {
           <p className="eyebrow">GRAPH</p>
           <h1>오차와 회귀선의 변화</h1>
         </div>
-        <Link className="secondary-button regswitch-home-button" href="/lab">
+        <div className="lab-header-action-stack">
+          <Link className="secondary-button regswitch-home-button" href="/lab">
           메인으로
-        </Link>
+          </Link>
+          <button
+            type="button"
+            className="secondary-button regswitch-home-button"
+            onClick={() =>
+              downloadCsv(
+                "rotating-regression-jamovi.csv",
+                X_VALUES.map((x, index) => ({ x_value: x, y_value: Y_VALUES[index] })),
+                [
+                  { label: "x_value", value: (row) => row.x_value.toFixed(6) },
+                  { label: "y_value", value: (row) => row.y_value.toFixed(6) },
+                ],
+              )
+            }
+          >
+            CSV 다운로드
+          </button>
+        </div>
       </header>
 
       <section className="rr-graphs">
@@ -378,7 +400,12 @@ export default function RotatingRegressionPage() {
           <strong>{currentIntercept.toFixed(2)}</strong>
         </article>
         <article>
+          <span>{"오차 합계"}</span>
+          <strong>{currentErrorSum.toFixed(2)}</strong>
+        </article>
+        <article>
           <span>오차제곱합 RSS</span>
+          <span>{"오차제곱합"}</span>
           <strong>{currentRss.toFixed(2)}</strong>
         </article>
         <article>

@@ -995,9 +995,11 @@ export default function BasicStatsRegressionPage() {
           <p className="eyebrow">Basic Statistics 1</p>
           <h1>회귀분석의 종류</h1>
         </div>
-        <Link className="secondary-button regswitch-home-button" href="/lab">
+        <div className="lab-header-action-stack">
+          <Link className="secondary-button regswitch-home-button" href="/lab">
           메인으로
-        </Link>
+          </Link>
+        </div>
       </header>
 
       <section className="regswitch-layout">

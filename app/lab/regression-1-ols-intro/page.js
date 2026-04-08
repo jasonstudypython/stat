@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { downloadCsv } from "../_shared/csv";
 
 const REG1_OLS_POINTS = [
   { x: 3.496714153, y: 3.4475037704 },
@@ -152,6 +153,29 @@ function approximateFCritical(alpha, d1, d2, maxX = 14, steps = 6000) {
     }
   }
   return maxX;
+}
+
+function approximateFPValue(fValue, d1, d2, maxX = 60, steps = 12000) {
+  if (fValue <= 0) {
+    return 1;
+  }
+
+  const upperBound = Math.max(maxX, fValue * 1.5);
+  const dx = upperBound / steps;
+  let tailArea = 0;
+
+  for (let index = 1; index <= steps; index += 1) {
+    const x0 = (index - 1) * dx;
+    const x1 = index * dx;
+    if (x1 <= fValue) {
+      continue;
+    }
+
+    const start = Math.max(x0, fValue);
+    tailArea += ((fPdf(start, d1, d2) + fPdf(x1, d1, d2)) / 2) * (x1 - start);
+  }
+
+  return Math.max(0, Math.min(1, tailArea));
 }
 
 function OlsErrorCurve({ width, height, values, currentSlope, showCurrentPoint = true }) {
@@ -907,6 +931,8 @@ export default function Regression1OlsIntroPage() {
   const rSquared = sstSum > 0 ? ssrSum / sstSum : 0;
   const fValue = mse > 0 ? msr / mse : 0;
   const fCritical = approximateFCritical(MODEL_ALPHA, 1, Math.max(visibleVectors.length - 2, 1));
+  const fPValue = approximateFPValue(fValue, 1, Math.max(visibleVectors.length - 2, 1));
+  const fPValueLabel = fPValue < 0.001 ? "p<.001" : `p=${fPValue.toFixed(3)}`;
 
   const curveValues = Array.from({ length: 81 }, (_, index) => {
     const slope = OLS_SLOPE_MIN + (index / 80) * (OLS_SLOPE_MAX - OLS_SLOPE_MIN);
@@ -938,9 +964,23 @@ export default function Regression1OlsIntroPage() {
           <p className="eyebrow">GRAPH</p>
           <h1>회귀분석 1</h1>
         </div>
-        <Link className="secondary-button regswitch-home-button" href="/lab">
+        <div className="lab-header-action-stack">
+          <Link className="secondary-button regswitch-home-button" href="/lab">
           메인으로
-        </Link>
+          </Link>
+          <button
+            type="button"
+            className="secondary-button regswitch-home-button"
+            onClick={() =>
+              downloadCsv("regression-1-ols-intro-jamovi.csv", REG1_OLS_POINTS, [
+                { label: "x_value", value: (row) => row.x.toFixed(6) },
+                { label: "y_value", value: (row) => row.y.toFixed(6) },
+              ])
+            }
+          >
+            CSV 다운로드
+          </button>
+        </div>
       </header>
 
       <section className="reg1intro-layout">
@@ -1336,9 +1376,12 @@ export default function Regression1OlsIntroPage() {
                       )}
                     </div>
                     <div className="reg1intro-ols-metric-row">
-                      <div className="reg1intro-ols-metric-cell">
+                      <div
+                        className={`reg1intro-ols-metric-cell ${modelMetric === "f" ? "is-f-summary" : ""}`}
+                        data-f-label="F값/p값"
+                      >
                         <span>{modelMetric === "r2" ? "R제곱" : "F값"}</span>
-                        <strong>{modelMetric === "r2" ? rSquared.toFixed(3) : fValue.toFixed(2)}</strong>
+                        <strong>{modelMetric === "r2" ? rSquared.toFixed(3) : `${fValue.toFixed(2)} / ${fPValueLabel}`}</strong>
                       </div>
                       <div className="reg1intro-ols-metric-cell">
                         <span>{modelMetric === "r2" ? "설명된 비율" : "기각역 임계값"}</span>

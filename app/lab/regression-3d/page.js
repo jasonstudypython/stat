@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { downloadCsv } from "../_shared/csv";
 
 const Plot = dynamic(() => import("react-plotly.js"), {
   ssr: false,
@@ -240,9 +241,32 @@ export default function Regression3DPage() {
             단면선을 강의 중 바로 조절할 수 있게 정리했습니다.
           </p>
         </div>
-        <Link className="secondary-button" href="/lab">
+        <div className="lab-header-action-stack">
+          <Link className="secondary-button" href="/lab">
           데이터랩으로
-        </Link>
+          </Link>
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() =>
+              downloadCsv(
+                "regression-3d-jamovi.csv",
+                scene.pointTrace.x.map((x1, index) => ({
+                  x1,
+                  x2: scene.pointTrace.y[index],
+                  y: scene.pointTrace.z[index],
+                })),
+                [
+                  { label: "study_hours", value: (row) => row.x1.toFixed(6) },
+                  { label: "sleep_hours", value: (row) => row.x2.toFixed(6) },
+                  { label: "score", value: (row) => row.y.toFixed(6) },
+                ],
+              )
+            }
+          >
+            CSV 다운로드
+          </button>
+        </div>
       </header>
 
       <section className="rr-graph-card rr3d-stage-card">
