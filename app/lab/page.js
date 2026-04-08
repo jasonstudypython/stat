@@ -63,8 +63,29 @@ const LAB_PAGES = [
     href: "/lab/regression-1-ols-intro",
     eyebrow: "REGRESSION",
     title: "OLS와 최소제곱법",
-    description: "회귀식 / 최소제곱법 / 모형 유의성 / 잔차 기본가정",
+    description: "최소제곱법 / 모형 유의성 / 잔차 기본가정",
     accent: "is-coral",
+  },
+  {
+    href: "/lab/multiple-regression-collinearity",
+    eyebrow: "REGRESSION",
+    title: "다중회귀분석과 공선성",
+    description: "회귀평면 / 통제 / 공선성",
+    accent: "is-amber",
+  },
+  {
+    href: "/lab/mediation-effect",
+    eyebrow: "REGRESSION",
+    title: "매개효과",
+    description: "X→M / X→Y / X+M→Y",
+    accent: "is-lilac",
+  },
+  {
+    href: "/lab/gender-moderation-effect",
+    eyebrow: "REGRESSION",
+    title: "조절효과와 성별",
+    description: "모형 / 상호작용 / 플롯",
+    accent: "is-blue",
   },
 ];
 
@@ -78,7 +99,7 @@ function ArrowIcon() {
 }
 
 export default function LabIndexPage() {
-  const orderedPages = [1, 0, 2, 3, 4, 5, 6, 7, 8].map((index) => LAB_PAGES[index]);
+  const orderedPages = [1, 0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((index) => LAB_PAGES[index]);
 
   return (
     <main className="rr-shell lab-index-shell">
@@ -88,7 +109,7 @@ export default function LabIndexPage() {
           <h1>통계 그래프 메인</h1>
         </div>
         <Link className="secondary-button lab-index-home" href="/">
-          메인으로
+          홈으로
         </Link>
       </header>
 
