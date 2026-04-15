@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useDeferredValue, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
 const Plot = dynamic(() => import("react-plotly.js"), {
   ssr: false,
@@ -942,8 +942,19 @@ export default function BasicStatsRegressionPage() {
   const [traceVisibility, setTraceVisibility] = useState({});
   const [hoveredPrediction, setHoveredPrediction] = useState(null);
   const [logisticApplied, setLogisticApplied] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const [mobileSliderValues, setMobileSliderValues] = useState(() =>
+    Object.fromEntries(VIEW_OPTIONS.map((option) => [option.key, 0.5])),
+  );
   const plotRevision = useRef(0);
   const deferredProgressValue = useDeferredValue(progressValue);
+
+  useEffect(() => {
+    const updateViewport = () => setIsMobileViewport(window.innerWidth <= 820);
+    updateViewport();
+    window.addEventListener("resize", updateViewport);
+    return () => window.removeEventListener("resize", updateViewport);
+  }, []);
 
   const activeScene = scenes[viewKey];
   const immediateProgress = progressValue / 100;
@@ -988,8 +999,134 @@ export default function BasicStatsRegressionPage() {
     }));
   };
 
+  const mobileSections = useMemo(
+    () =>
+      VIEW_OPTIONS.map((option) => {
+        const scene = scenes[option.key];
+        return {
+          key: option.key,
+          title: scene.title,
+          formula: scene.formula,
+          sliderLabel: scene.sliderLabel,
+          dimension: scene.dimension,
+        };
+      }),
+    [scenes],
+  );
+
+  if (isMobileViewport) {
+    return (
+      <main className="rr-shell regswitch-shell basicreg-shell">
+        <div className="regswitch-mobile-stack">
+          {mobileSections.map((section) => (
+            <section key={section.key} className="regswitch-mobile-section">
+              <div className="regswitch-mobile-head">
+                <p className="panel-label">Graph</p>
+                <h2 className="regswitch-title">{section.title}</h2>
+                <p className="regswitch-formula">{section.formula}</p>
+              </div>
+
+              {(() => {
+                const scene = scenes[section.key];
+                const sliderValue = mobileSliderValues[section.key] ?? 0.5;
+                const sectionPlot =
+                  section.key === "logistic"
+                    ? scene.plot(sliderValue, true)
+                    : scene.plot(sliderValue);
+                const sectionPoint =
+                  section.key === "logistic"
+                    ? scene.pointAt(sliderValue, true)
+                    : scene.pointAt(sliderValue);
+
+                return (
+                  <>
+                    <div
+                      className={`regswitch-plot-wrap ${
+                        section.dimension === "subplot" ? "is-subplot" : ""
+                      }`}
+                    >
+                      <Plot
+                        data={sectionPlot.data.map((trace) => ({
+                          ...trace,
+                          visible: trace.visible === false ? false : true,
+                        }))}
+                        layout={{
+                          paper_bgcolor: "rgba(0,0,0,0)",
+                          plot_bgcolor: "rgba(0,0,0,0)",
+                          margin: { l: 56, r: 18, t: 24, b: 68 },
+                          autosize: true,
+                          font: {
+                            family: "Pretendard, Noto Sans KR, sans-serif",
+                            color: "#112d4e",
+                            size: 14,
+                          },
+                          legend: {
+                            orientation: "h",
+                            yanchor: "bottom",
+                            y: 1.02,
+                            xanchor: "left",
+                            x: 0,
+                          },
+                          uirevision: `${section.key}-mobile`,
+                          ...sectionPlot.layout,
+                        }}
+                        config={{
+                          responsive: true,
+                          showTips: true,
+                          doubleClick: "reset+autosize",
+                          displaylogo: false,
+                          modeBarButtonsToRemove: ["lasso2d", "select2d"],
+                        }}
+                        style={{ width: "100%", height: "100%" }}
+                      />
+                    </div>
+
+                    <section className="regswitch-slider-card regswitch-mobile-slider">
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.01"
+                        value={sliderValue}
+                        onChange={(event) =>
+                          setMobileSliderValues((current) => ({
+                            ...current,
+                            [section.key]: Number(event.target.value),
+                          }))
+                        }
+                        aria-label={`${section.title} ${section.sliderLabel}`}
+                      />
+                    </section>
+
+                    <section className="regswitch-slider-card regswitch-mobile-summary">
+                      <div className="regswitch-value-grid">
+                        {sectionPoint.cards.map((item) => (
+                          <div key={`${section.key}-${item.label}`}>
+                            <small>{item.label}</small>
+                            <strong>{item.value}</strong>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="regswitch-equation-value">{sectionPoint.equationValue}</p>
+                    </section>
+                  </>
+                );
+              })()}
+            </section>
+          ))}
+        </div>
+
+        <div className="regswitch-mobile-footer">
+          <Link className="secondary-button regswitch-home-button" href="/lab">
+            메인으로
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
   return (
-    <main className="rr-shell regswitch-shell">
+    <main className="rr-shell regswitch-shell basicreg-shell">
       <header className="rr-header">
         <div>
           <p className="eyebrow">Basic Statistics 1</p>
@@ -1037,6 +1174,8 @@ export default function BasicStatsRegressionPage() {
               }}
               config={{
                 responsive: true,
+                showTips: true,
+                doubleClick: "reset+autosize",
                 displaylogo: false,
                 modeBarButtonsToRemove: ["lasso2d", "select2d"],
               }}

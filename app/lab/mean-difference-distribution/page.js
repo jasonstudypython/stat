@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import rawHeightData from "../../../data_mdis_height.json";
 
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
@@ -845,6 +845,18 @@ export default function MeanDifferenceDistributionPage() {
   const [roundsShown, setRoundsShown] = useState(0);
   const [populationMode, setPopulationMode] = useState("actual");
   const [distributionMode, setDistributionMode] = useState("difference");
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const updateMobile = () => setIsMobile(window.innerWidth <= 820);
+    updateMobile();
+    window.addEventListener("resize", updateMobile);
+    return () => window.removeEventListener("resize", updateMobile);
+  }, []);
+
+  const effectiveSampleSize = isMobile ? 10 : sampleSize;
+  const effectiveDistributionMode = isMobile ? "t" : distributionMode;
 
   const grouped = useMemo(() => {
     const male = rawHeightData.filter((row) => row.sex === "남").map((row) => Number(row.height));
@@ -877,13 +889,33 @@ export default function MeanDifferenceDistributionPage() {
       createSamplingRounds(
         populations.male,
         populations.female,
-        sampleSize,
-        7000 + sampleSize * 17 + (populationMode === "null" ? 1 : 0)
+        effectiveSampleSize,
+        7000 + effectiveSampleSize * 17 + (populationMode === "null" ? 1 : 0)
       ),
-    [populationMode, populations, sampleSize]
+    [effectiveSampleSize, populationMode, populations]
   );
 
   const visibleRounds = rounds.slice(0, roundsShown);
+  const malePopulationMean = mean(populations.male);
+  const femalePopulationMean = mean(populations.female);
+  const meanDifference = femalePopulationMean - malePopulationMean;
+  const cardMeanDifference = malePopulationMean - femalePopulationMean;
+  const meanArrowX = 0.5;
+  const meanArrowMid = (malePopulationMean + femalePopulationMean) / 2;
+  const pooledPopulationVariance =
+    (
+      ((effectiveSampleSize - 1) * variance(populations.male)) +
+      ((effectiveSampleSize - 1) * variance(populations.female))
+    ) / Math.max(2 * effectiveSampleSize - 2, 1);
+  const effectiveStandardError = Math.sqrt(pooledPopulationVariance * (2 / effectiveSampleSize));
+  const effectiveTValue = cardMeanDifference / Math.max(effectiveStandardError, 1e-6);
+  const desktopPooledPopulationVariance =
+    (
+      ((sampleSize - 1) * variance(populations.male)) +
+      ((sampleSize - 1) * variance(populations.female))
+    ) / Math.max(2 * sampleSize - 2, 1);
+  const desktopStandardError = Math.sqrt(desktopPooledPopulationVariance * (2 / sampleSize));
+  const desktopTValue = cardMeanDifference / Math.max(desktopStandardError, 1e-6);
   const leftPlotData = useMemo(() => {
     const maleDots = buildViolinDots(populations.male, 0);
     const femaleDots = buildViolinDots(populations.female, 1);
@@ -899,22 +931,22 @@ export default function MeanDifferenceDistributionPage() {
 
   const summaryText = useMemo(() => {
     if (roundsShown === 0) {
-      return distributionMode === "difference"
+      return effectiveDistributionMode === "difference"
         ? "반복 표집을 시작하면 평균 차이 도트가 쌓입니다."
         : "반복 표집을 시작하면 t 값 도트가 쌓입니다.";
     }
     const current = visibleRounds[visibleRounds.length - 1];
-    return distributionMode === "difference"
+    return effectiveDistributionMode === "difference"
       ? `현재 평균 차이 ${formatNumber(current.diff)}cm`
       : `현재 t 값 ${formatNumber(current.tValue)}`;
-  }, [distributionMode, roundsShown, visibleRounds]);
+  }, [effectiveDistributionMode, roundsShown, visibleRounds]);
 
   return (
     <main className="rr-shell tf-shell meandiff-shell">
       <header className="rr-header tf-header meandiff-header">
         <div>
           <p className="eyebrow">GRAPH</p>
-          <h1>집단간 평균 차이의 표집 분포</h1>
+          <h1>영가설 분포</h1>
         </div>
         <div className="lab-header-action-stack">
           <Link className="secondary-button regswitch-home-button" href="/lab">
@@ -932,32 +964,65 @@ export default function MeanDifferenceDistributionPage() {
                 {populationMode === "actual" ? "남성과 여성의 키 분포" : "평균 차이가 0인 영가설의 분포"}
               </h2>
               <p className="regswitch-formula">
-                남성 평균 {formatNumber(mean(populations.male))}cm / 여성 평균 {formatNumber(mean(populations.female))}cm
+                남성 평균 {formatNumber(malePopulationMean)}cm / 여성 평균 {formatNumber(femalePopulationMean)}cm
               </p>
             </div>
-            <div className="tf-analysis-toggle">
-              <button
-                type="button"
-                className={populationMode === "actual" ? "active" : ""}
-                onClick={() => {
-                  setPopulationMode("actual");
-                  setRoundsShown(0);
-                }}
-              >
-                실제 분포
-              </button>
-              <button
-                type="button"
-                className={populationMode === "null" ? "active" : ""}
-                onClick={() => {
-                  setPopulationMode("null");
-                  setRoundsShown(0);
-                }}
-              >
-                영가설 분포
-              </button>
-            </div>
+            {isMobile ? (
+              <div className="meandiff-mobile-select-row">
+                <select
+                  className="meandiff-select"
+                  value={populationMode}
+                  onChange={(event) => {
+                    setPopulationMode(event.target.value);
+                    setRoundsShown(0);
+                  }}
+                >
+                  <option value="actual">실제 분포</option>
+                  <option value="null">영가설 분포</option>
+                </select>
+              </div>
+            ) : (
+              <div className="tf-analysis-toggle">
+                <button
+                  type="button"
+                  className={populationMode === "actual" ? "active" : ""}
+                  onClick={() => {
+                    setPopulationMode("actual");
+                    setRoundsShown(0);
+                  }}
+                >
+                  실제 분포
+                </button>
+                <button
+                  type="button"
+                  className={populationMode === "null" ? "active" : ""}
+                  onClick={() => {
+                    setPopulationMode("null");
+                    setRoundsShown(0);
+                  }}
+                >
+                  영가설 분포
+                </button>
+              </div>
+            )}
           </div>
+
+          {isMobile ? (
+            <section className="tf-metric-grid is-three meandiff-mobile-metrics">
+              <article className="tf-metric-card">
+                <span>평균 차이</span>
+                <strong>{formatNumber(cardMeanDifference)}</strong>
+              </article>
+              <article className="tf-metric-card">
+                <span>표준오차</span>
+                <strong>{formatNumber(effectiveStandardError)}</strong>
+              </article>
+              <article className="tf-metric-card">
+                <span>평균 차이의 t값</span>
+                <strong>{formatNumber(effectiveTValue)}</strong>
+              </article>
+            </section>
+          ) : null}
 
           <div className="tf-plot-wrap meandiff-left-plot">
             <Plot
@@ -1027,24 +1092,32 @@ export default function MeanDifferenceDistributionPage() {
                     type: "line",
                     x0: -0.2,
                     x1: 0.2,
-                    y0: mean(populations.male),
-                    y1: mean(populations.male),
+                    y0: malePopulationMean,
+                    y1: malePopulationMean,
                     line: { color: "#ef4444", width: 3 },
                   },
                   {
                     type: "line",
                     x0: 0.8,
                     x1: 1.2,
-                    y0: mean(populations.female),
-                    y1: mean(populations.female),
+                    y0: femalePopulationMean,
+                    y1: femalePopulationMean,
                     line: { color: "#2563eb", width: 3 },
+                  },
+                  {
+                    type: "line",
+                    x0: meanArrowX,
+                    x1: meanArrowX,
+                    y0: malePopulationMean,
+                    y1: femalePopulationMean,
+                    line: { color: "#0f766e", width: 3 },
                   },
                 ],
                 annotations: [
                   {
                     x: 0.24,
-                    y: mean(populations.male),
-                    text: formatNumber(mean(populations.male)),
+                    y: malePopulationMean,
+                    text: formatNumber(malePopulationMean),
                     showarrow: false,
                     xanchor: "left",
                     yanchor: "middle",
@@ -1055,8 +1128,8 @@ export default function MeanDifferenceDistributionPage() {
                   },
                   {
                     x: 1.24,
-                    y: mean(populations.female),
-                    text: formatNumber(mean(populations.female)),
+                    y: femalePopulationMean,
+                    text: formatNumber(femalePopulationMean),
                     showarrow: false,
                     xanchor: "left",
                     yanchor: "middle",
@@ -1064,6 +1137,46 @@ export default function MeanDifferenceDistributionPage() {
                     bgcolor: "rgba(255,255,255,0.92)",
                     bordercolor: "rgba(37,99,235,0.14)",
                     borderpad: 2,
+                  },
+                  {
+                    x: meanArrowX,
+                    y: femalePopulationMean,
+                    axref: "x",
+                    ayref: "y",
+                    ax: meanArrowX,
+                    ay: meanArrowMid,
+                    text: "",
+                    showarrow: true,
+                    arrowhead: 3,
+                    arrowsize: 1,
+                    arrowwidth: 2,
+                    arrowcolor: "#0f766e",
+                  },
+                  {
+                    x: meanArrowX,
+                    y: malePopulationMean,
+                    axref: "x",
+                    ayref: "y",
+                    ax: meanArrowX,
+                    ay: meanArrowMid,
+                    text: "",
+                    showarrow: true,
+                    arrowhead: 3,
+                    arrowsize: 1,
+                    arrowwidth: 2,
+                    arrowcolor: "#0f766e",
+                  },
+                  {
+                    x: meanArrowX + 0.08,
+                    y: meanArrowMid,
+                    text: `${formatNumber(meanDifference)}cm`,
+                    showarrow: false,
+                    xanchor: "left",
+                    yanchor: "middle",
+                    font: { size: 13, color: "#0f766e" },
+                    bgcolor: "rgba(255,255,255,0.94)",
+                    bordercolor: "rgba(15,118,110,0.18)",
+                    borderpad: 3,
                   },
                 ],
                 xaxis: {
@@ -1087,31 +1200,22 @@ export default function MeanDifferenceDistributionPage() {
             />
           </div>
 
-          <section className="tf-metric-grid">
-            <article className="tf-metric-card">
-              <span>남성 평균</span>
-              <strong>{formatNumber(mean(populations.male))}</strong>
-            </article>
-            <article className="tf-metric-card">
-              <span>여성 평균</span>
-              <strong>{formatNumber(mean(populations.female))}</strong>
-            </article>
+          {!isMobile ? (
+          <section className="tf-metric-grid is-three">
             <article className="tf-metric-card">
               <span>평균 차이</span>
-              <strong>{formatNumber(mean(populations.male) - mean(populations.female))}</strong>
+              <strong>{formatNumber(cardMeanDifference)}</strong>
             </article>
             <article className="tf-metric-card">
               <span>평균 차이의 표준오차</span>
-              <strong>
-                {formatNumber(
-                  Math.sqrt(
-                    (standardDeviation(populations.male) ** 2) / sampleSize +
-                      (standardDeviation(populations.female) ** 2) / sampleSize
-                  )
-                )}
-              </strong>
+              <strong>{formatNumber(desktopStandardError)}</strong>
+            </article>
+            <article className="tf-metric-card">
+              <span>평균 차이의 t값</span>
+              <strong>{formatNumber(desktopTValue)}</strong>
             </article>
           </section>
+          ) : null}
         </article>
 
         <article className="rr-graph-card tf-small-card">
@@ -1122,22 +1226,24 @@ export default function MeanDifferenceDistributionPage() {
                 {distributionMode === "difference" ? "평균 차이의 표집 분포" : "t값의 표집 분포"}
               </h2>
             </div>
+            {!isMobile ? (
             <div className="meandiff-control-row">
-              <select
-                className="meandiff-select"
-                value={sampleSize}
-                onChange={(event) => {
-                  setSampleSize(Number(event.target.value));
-                  setRoundsShown(0);
-                }}
-              >
-                {SAMPLE_SIZE_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    표집 크기 {option}
-                  </option>
-                ))}
-              </select>
-              <div className="tf-analysis-toggle">
+                <select
+                  className="meandiff-select"
+                  value={effectiveSampleSize}
+                  onChange={(event) => {
+                    setSampleSize(Number(event.target.value));
+                    setRoundsShown(0);
+                  }}
+                  disabled={isMobile}
+                >
+                  {SAMPLE_SIZE_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      표집 크기 {option}
+                    </option>
+                  ))}
+                </select>
+              <div className="tf-analysis-toggle" style={isMobile ? { display: "none" } : undefined}>
                 <button
                   type="button"
                   className="meandiff-hidden-toggle"
@@ -1150,23 +1256,24 @@ export default function MeanDifferenceDistributionPage() {
                   className={distributionMode === "t" ? "active" : ""}
                   onClick={() => setDistributionMode((current) => (current === "t" ? "difference" : "t"))}
                 >
-                  t분포
+                  t분포 곡선
                 </button>
               </div>
             </div>
+            ) : null}
           </div>
 
           <div className="tf-small-plot tf-side-plot meandiff-svg-wrap">
             <DistributionSvgFinal3
-              mode={distributionMode}
+              mode={effectiveDistributionMode}
               visibleRounds={visibleRounds}
               allRounds={rounds}
-              sampleSize={sampleSize}
-              centerValue={populationMode === "null" ? 0 : null}
+              sampleSize={effectiveSampleSize}
+              centerValue={populationMode === "null" ? 0 : effectiveDistributionMode === "t" ? effectiveTValue : null}
               forceCenterZero={populationMode === "null"}
             />
             <div className="meandiff-axis-caption" aria-hidden="true">
-              {distributionMode === "t" ? "t값" : "평균 차이 (cm)"}
+              {effectiveDistributionMode === "t" ? "t값" : "평균 차이 (cm)"}
             </div>
           </div>
 

@@ -2,9 +2,10 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import fatData from "../../../data_mdis_fat.json";
 import { downloadCsv } from "../_shared/csv";
+import { useMobileFitScale } from "../_shared/useMobileFitScale";
 
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
 
@@ -19,6 +20,14 @@ function variance(values) {
 
 function standardDeviation(values) {
   return Math.sqrt(variance(values));
+}
+
+function hexToRgba(hex, alpha) {
+  const normalized = hex.replace("#", "");
+  const red = Number.parseInt(normalized.slice(0, 2), 16);
+  const green = Number.parseInt(normalized.slice(2, 4), 16);
+  const blue = Number.parseInt(normalized.slice(4, 6), 16);
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
 }
 
 function erf(x) {
@@ -117,11 +126,26 @@ const CRITICAL_T = {
   0.01: 2.576,
 };
 
+const MOBILE_TF_SECTIONS = [
+  { key: "t-compare", groupTitle: "t검정", sectionTitle: "집단 비교" },
+  { key: "t-dist", groupTitle: "t검정", sectionTitle: "t분포" },
+  { key: "f-compare", groupTitle: "F검정", sectionTitle: "집단 비교" },
+  { key: "f-dist", groupTitle: "F검정", sectionTitle: "F분포" },
+];
+
 export default function TFAnalysisPage() {
+  const mobileFit = useMobileFitScale(820, 560);
   const [alpha, setAlpha] = useState(0.05);
   const [analysisMode, setAnalysisMode] = useState("t");
   const [showStatisticScale, setShowStatisticScale] = useState(false);
   const [showJitter, setShowJitter] = useState(false);
+  const varianceSquareWidthRatio = mobileFit.height !== null ? 0.65 : 0.52;
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.innerWidth <= 820) {
+      setShowStatisticScale(true);
+    }
+  }, []);
 
   const maleFat = useMemo(() => fatData.male.map(Number), []);
   const femaleFat = useMemo(() => fatData.female.map(Number), []);
@@ -129,21 +153,27 @@ export default function TFAnalysisPage() {
   const stats = useMemo(() => {
     const maleMean = mean(maleFat);
     const femaleMean = mean(femaleFat);
+    const overallMean = mean([...maleFat, ...femaleFat]);
     const maleVar = variance(maleFat);
     const femaleVar = variance(femaleFat);
     const n1 = maleFat.length;
     const n2 = femaleFat.length;
-    const pooledVariance = (((n1 - 1) * maleVar) + ((n2 - 1) * femaleVar)) / (n1 + n2 - 2);
+    const ssBetween = n1 * (maleMean - overallMean) ** 2 + n2 * (femaleMean - overallMean) ** 2;
+    const ssWithin = (n1 - 1) * maleVar + (n2 - 1) * femaleVar;
+    const msBetween = ssBetween / 1;
+    const pooledVariance = ssWithin / (n1 + n2 - 2);
     const standardError = Math.sqrt(pooledVariance * (1 / n1 + 1 / n2));
     const tValue = (maleMean - femaleMean) / standardError;
     const df = n1 + n2 - 2;
     const pValue = 2 * (1 - normalCdf(Math.abs(tValue)));
-    const fValue = tValue ** 2;
+    const fValue = msBetween / pooledVariance;
 
     return {
       maleMean,
       femaleMean,
-      overallMean: mean([...maleFat, ...femaleFat]),
+      overallMean,
+      msBetween,
+      pooledVariance,
       tValue,
       fValue,
       df,
@@ -387,6 +417,384 @@ export default function TFAnalysisPage() {
     };
   }, [showStatisticScale, stats.tValue, tAxisRange]);
 
+  const meanDifference = Math.abs(stats.femaleMean - stats.maleMean);
+  const lowerMean = Math.min(stats.maleMean, stats.femaleMean);
+  const upperMean = Math.max(stats.maleMean, stats.femaleMean);
+  const compareYRange = useMemo(() => {
+    const allValues = [...maleFat, ...femaleFat];
+    const minValue = Math.min(...allValues);
+    const maxValue = Math.max(...allValues);
+    const padding = Math.max(3, (maxValue - minValue) * 0.08);
+    return [minValue - padding, maxValue + padding];
+  }, [femaleFat, maleFat]);
+  const fVarianceGuide = useMemo(() => {
+    const maleSd = standardDeviation(maleFat);
+    const femaleSd = standardDeviation(femaleFat);
+    const betweenColor = "#06b6d4";
+    const withinColor = "#f97316";
+
+    return {
+      between: [
+        { x: 0.445, start: stats.maleMean, end: stats.overallMean, color: betweenColor },
+        { x: 0.555, start: stats.overallMean, end: stats.femaleMean, color: betweenColor },
+      ],
+      maleWithin: [
+        { x: 0.13, end: stats.maleMean - maleSd * 1.0, color: withinColor, centerX: 0.18 },
+        { x: 0.16, end: stats.maleMean - maleSd * 2.0, color: withinColor, centerX: 0.18 },
+        { x: 0.20, end: stats.maleMean + maleSd * 1.9, color: withinColor, centerX: 0.18 },
+        { x: 0.24, end: stats.maleMean + maleSd * 1.1, color: withinColor, centerX: 0.18 },
+      ],
+      femaleWithin: [
+        { x: 0.765, end: stats.femaleMean - femaleSd * 1.1, color: withinColor, centerX: 0.825 },
+        { x: 0.805, end: stats.femaleMean - femaleSd * 1.95, color: withinColor, centerX: 0.825 },
+        { x: 0.845, end: stats.femaleMean + femaleSd * 1.9, color: withinColor, centerX: 0.825 },
+        { x: 0.885, end: stats.femaleMean + femaleSd * 1.1, color: withinColor, centerX: 0.825 },
+      ],
+    };
+  }, [femaleFat, maleFat, stats.femaleMean, stats.maleMean, stats.overallMean]);
+
+  const valueToPaperY = (value) =>
+    (value - compareYRange[0]) / Math.max(compareYRange[1] - compareYRange[0], 1);
+
+  const createVarianceSquare = ({ x, start, end, color, centerX = x }) => {
+    const lowPaper = valueToPaperY(Math.min(start, end));
+    const highPaper = valueToPaperY(Math.max(start, end));
+    const side = Math.max(highPaper - lowPaper, 0.028);
+    const squareWidth = Math.max(side * varianceSquareWidthRatio, 0.022);
+    const x0 = x <= centerX ? x : x - squareWidth;
+    return {
+      type: "rect",
+      xref: "paper",
+      yref: "paper",
+      x0,
+      x1: x0 + squareWidth,
+      y0: lowPaper,
+      y1: highPaper,
+      fillcolor: hexToRgba(color, 0.14),
+      line: { color, width: 1 },
+      layer: "below",
+    };
+  };
+
+  const buildCompareLayout = (mode) => ({
+    autosize: true,
+    violinmode: "group",
+    violingap: 0.08,
+    violingroupgap: 0.04,
+    paper_bgcolor: "rgba(0,0,0,0)",
+    plot_bgcolor: "rgba(255,255,255,0.98)",
+    font: { family: "Pretendard, Noto Sans KR, sans-serif", color: "#112d4e", size: 16 },
+    margin: { l: 72, r: 42, t: 24, b: 68 },
+    showlegend: false,
+    shapes: [
+      {
+        type: "line",
+        xref: "paper",
+        x0: 0,
+        x1: 1,
+        y0: stats.overallMean,
+        y1: stats.overallMean,
+        line: { color: "#8b5cf6", width: 2 },
+        visible: mode === "f",
+      },
+      {
+        type: "line",
+        xref: "paper",
+        x0: 0.085,
+        x1: 0.445,
+        y0: stats.maleMean,
+        y1: stats.maleMean,
+        line: { color: "#ef4444", width: 3 },
+        visible: true,
+      },
+      {
+        type: "line",
+        xref: "paper",
+        x0: 0.555,
+        x1: 0.915,
+        y0: stats.femaleMean,
+        y1: stats.femaleMean,
+        line: { color: "#2563eb", width: 3 },
+        visible: true,
+      },
+      ...(mode === "f"
+        ? [
+            ...fVarianceGuide.between.map((guide) => createVarianceSquare(guide)),
+            ...fVarianceGuide.maleWithin.map((guide) =>
+              createVarianceSquare({ ...guide, start: stats.maleMean }),
+            ),
+            ...fVarianceGuide.femaleWithin.map((guide) =>
+              createVarianceSquare({ ...guide, start: stats.femaleMean }),
+            ),
+          ]
+        : []),
+    ],
+    annotations: [
+      {
+        x: 0.5,
+        xref: "paper",
+        y: upperMean,
+        yref: "y",
+        ax: 0.5,
+        axref: "paper",
+        ay: lowerMean,
+        ayref: "y",
+        text: "",
+        showarrow: true,
+        arrowside: "end+start",
+        arrowhead: 3,
+        startarrowhead: 3,
+        arrowsize: 1,
+        startarrowsize: 1,
+        arrowwidth: 2.5,
+        arrowcolor: "#60a5fa",
+        visible: mode === "t",
+      },
+      {
+        x: 0.535,
+        xref: "paper",
+        y: (stats.maleMean + stats.femaleMean) / 2,
+        yref: "y",
+        text: meanDifference.toFixed(2),
+        showarrow: false,
+        xanchor: "left",
+        yanchor: "middle",
+        font: { size: 14, color: "#374151" },
+        bgcolor: "rgba(255,255,255,0.92)",
+        bordercolor: "rgba(96,165,250,0.22)",
+        borderpad: 2,
+        visible: mode === "t",
+      },
+      {
+        x: 0.97,
+        xref: "paper",
+        y: stats.overallMean,
+        text: `전체평균 ${stats.overallMean.toFixed(2)}`,
+        showarrow: false,
+        xanchor: "right",
+        yanchor: "middle",
+        font: { size: 12, color: "#8b5cf6" },
+        bgcolor: "rgba(255,255,255,0.92)",
+        bordercolor: "rgba(139,92,246,0.14)",
+        borderpad: 2,
+        visible: mode === "f",
+      },
+      {
+        x: 0.275,
+        xref: "paper",
+        y: stats.maleMean,
+        text: stats.maleMean.toFixed(2),
+        showarrow: false,
+        xanchor: "left",
+        yanchor: "middle",
+        font: { size: 12, color: "#ef4444" },
+        bgcolor: "rgba(255,255,255,0.92)",
+        bordercolor: "rgba(239,68,68,0.14)",
+        borderpad: 2,
+        visible: true,
+      },
+      {
+        x: 0.935,
+        xref: "paper",
+        y: stats.femaleMean,
+        text: stats.femaleMean.toFixed(2),
+        showarrow: false,
+        xanchor: "left",
+        yanchor: "middle",
+        font: { size: 12, color: "#2563eb" },
+        bgcolor: "rgba(255,255,255,0.92)",
+        bordercolor: "rgba(37,99,235,0.14)",
+        borderpad: 2,
+        visible: true,
+      },
+      ...(mode === "f"
+        ? [
+            {
+              x: 0.595,
+              xref: "paper",
+              y: stats.overallMean + 0.2,
+              yref: "y",
+              text: "집단간 차이 제곱",
+              showarrow: false,
+              xanchor: "left",
+              yanchor: "bottom",
+              font: { size: 13, color: "#06b6d4" },
+              bgcolor: "rgba(255,255,255,0.9)",
+              bordercolor: "rgba(6,182,212,0.18)",
+              borderpad: 2,
+            },
+            {
+              x: 0.285,
+              xref: "paper",
+              y: stats.maleMean - standardDeviation(maleFat) * 2.05,
+              yref: "y",
+              text: "집단내 차이 제곱",
+              showarrow: false,
+              xanchor: "left",
+              yanchor: "middle",
+              font: { size: 13, color: "#f97316" },
+              bgcolor: "rgba(255,255,255,0.9)",
+              bordercolor: "rgba(249,115,22,0.18)",
+              borderpad: 2,
+            },
+            ...fVarianceGuide.between.map((guide) => ({
+              x: guide.x,
+              xref: "paper",
+              y: guide.end,
+              yref: "y",
+              ax: guide.x,
+              axref: "paper",
+              ay: guide.start,
+              ayref: "y",
+              text: "",
+              showarrow: true,
+              arrowside: "end+start",
+              arrowhead: 3,
+              startarrowhead: 3,
+              arrowsize: 1,
+              startarrowsize: 1,
+              arrowwidth: 2.4,
+              arrowcolor: guide.color,
+            })),
+            ...fVarianceGuide.maleWithin.map((guide) => ({
+              x: guide.x,
+              xref: "paper",
+              y: guide.end,
+              yref: "y",
+              ax: guide.x,
+              axref: "paper",
+              ay: stats.maleMean,
+              ayref: "y",
+              text: "",
+              showarrow: true,
+              arrowside: "end+start",
+              arrowhead: 3,
+              startarrowhead: 3,
+              arrowsize: 1,
+              startarrowsize: 1,
+              arrowwidth: 2.1,
+              arrowcolor: guide.color,
+            })),
+            ...fVarianceGuide.femaleWithin.map((guide) => ({
+              x: guide.x,
+              xref: "paper",
+              y: guide.end,
+              yref: "y",
+              ax: guide.x,
+              axref: "paper",
+              ay: stats.femaleMean,
+              ayref: "y",
+              text: "",
+              showarrow: true,
+              arrowside: "end+start",
+              arrowhead: 3,
+              startarrowhead: 3,
+              arrowsize: 1,
+              startarrowsize: 1,
+              arrowwidth: 2.1,
+              arrowcolor: guide.color,
+            })),
+          ]
+        : []),
+    ],
+    xaxis: {
+      title: { text: "성별", standoff: 16 },
+      showgrid: false,
+      tickfont: { size: 14 },
+    },
+    yaxis: {
+      title: { text: "체지방률", standoff: 14 },
+      range: compareYRange,
+      showgrid: true,
+      gridcolor: "rgba(17,45,78,0.08)",
+      tickfont: { size: 14 },
+    },
+    uirevision: `tf-compare-${showJitter ? "jitter" : "violin"}-${mode}`,
+  });
+
+  const buildDistributionLayout = (mode) => ({
+    autosize: true,
+    paper_bgcolor: "rgba(0,0,0,0)",
+    plot_bgcolor: "rgba(255,255,255,0.98)",
+    font: { family: "Pretendard, Noto Sans KR, sans-serif", color: "#112d4e", size: 15 },
+    margin: { l: 68, r: 24, t: 22, b: 58 },
+    showlegend: false,
+    shapes: mode === "t" ? tPlot.shapes : fPlot.shapes,
+    annotations: mode === "t" ? tPlot.annotations : fPlot.annotations,
+    xaxis:
+      mode === "t"
+        ? {
+            title: { text: "t 값", standoff: 14 },
+            ...tAxisSpec,
+            showgrid: true,
+            gridcolor: "rgba(17,45,78,0.08)",
+            tickangle: 0,
+            automargin: true,
+          }
+        : {
+            title: { text: "F 값", standoff: 14 },
+            ...fAxisSpec,
+            showgrid: true,
+            gridcolor: "rgba(17,45,78,0.08)",
+            tickangle: 0,
+            automargin: true,
+          },
+    yaxis: {
+      title: { text: "밀도", standoff: 12 },
+      ...(mode === "f" ? { range: [0, 4] } : { range: [0, 0.7] }),
+      showgrid: true,
+      gridcolor: "rgba(17,45,78,0.08)",
+      showline: true,
+      linecolor: "#112d4e",
+      linewidth: 2,
+      zeroline: false,
+    },
+    uirevision: `tf-dist-${mode}-${alpha}-${showStatisticScale}`,
+  });
+
+  const mobileSections = MOBILE_TF_SECTIONS.map((section) => {
+    if (section.key === "t-compare") {
+      return {
+        ...section,
+        data: compareTraces,
+        layout: buildCompareLayout("t"),
+        metrics: [
+          { label: "남성과 여성의 평균 차이", value: meanDifference.toFixed(2) },
+          { label: "t 통계량", value: stats.tValue.toFixed(2) },
+          { label: "유의확률 p", value: stats.pValue < 0.001 ? "0.000" : stats.pValue.toFixed(3) },
+        ],
+      };
+    }
+
+    if (section.key === "t-dist") {
+      return {
+        ...section,
+        data: tPlot.traces,
+        layout: buildDistributionLayout("t"),
+      };
+    }
+
+    if (section.key === "f-compare") {
+      return {
+        ...section,
+        data: compareTraces,
+        layout: buildCompareLayout("f"),
+        metrics: [
+          { label: "집단간 평균제곱합", value: stats.msBetween.toFixed(2) },
+          { label: "집단내 평균제곱합", value: stats.pooledVariance.toFixed(2) },
+          { label: "F 통계량", value: stats.fValue.toFixed(2) },
+          { label: "자유도", value: `1, ${stats.df}` },
+        ],
+      };
+    }
+
+    return {
+      ...section,
+      data: fPlot.traces,
+      layout: buildDistributionLayout("f"),
+    };
+  });
+
   return (
     <main className="rr-shell tf-shell">
       <header className="rr-header tf-header">
@@ -462,119 +870,35 @@ export default function TFAnalysisPage() {
           <div className="tf-plot-wrap">
             <Plot
               data={compareTraces}
-              layout={{
-                autosize: true,
-                violinmode: "group",
-                violingap: 0.08,
-                violingroupgap: 0.04,
-                paper_bgcolor: "rgba(0,0,0,0)",
-                plot_bgcolor: "rgba(255,255,255,0.98)",
-                font: { family: "Pretendard, Noto Sans KR, sans-serif", color: "#112d4e", size: 16 },
-                margin: { l: 72, r: 42, t: 24, b: 68 },
-                showlegend: false,
-                shapes: [
-                  {
-                    type: "line",
-                    xref: "paper",
-                    x0: 0,
-                    x1: 1,
-                    y0: stats.overallMean,
-                    y1: stats.overallMean,
-                    line: { color: "#8b5cf6", width: 2 },
-                    visible: analysisMode === "f",
-                  },
-                  {
-                    type: "line",
-                    xref: "paper",
-                    x0: 0.085,
-                    x1: 0.255,
-                    y0: stats.maleMean,
-                    y1: stats.maleMean,
-                    line: { color: "#ef4444", width: 3 },
-                    visible: true,
-                  },
-                  {
-                    type: "line",
-                    xref: "paper",
-                    x0: 0.745,
-                    x1: 0.915,
-                    y0: stats.femaleMean,
-                    y1: stats.femaleMean,
-                    line: { color: "#2563eb", width: 3 },
-                    visible: true,
-                  },
-                ],
-                annotations: [
-                  {
-                    x: 0.97,
-                    xref: "paper",
-                    y: stats.overallMean,
-                    text: `전체평균 ${stats.overallMean.toFixed(2)}`,
-                    showarrow: false,
-                    xanchor: "right",
-                    yanchor: "middle",
-                    font: { size: 12, color: "#8b5cf6" },
-                    bgcolor: "rgba(255,255,255,0.92)",
-                    bordercolor: "rgba(139,92,246,0.14)",
-                    borderpad: 2,
-                    visible: analysisMode === "f",
-                  },
-                  {
-                    x: 0.275,
-                    xref: "paper",
-                    y: stats.maleMean,
-                    text: stats.maleMean.toFixed(2),
-                    showarrow: false,
-                    xanchor: "left",
-                    yanchor: "middle",
-                    font: { size: 12, color: "#ef4444" },
-                    bgcolor: "rgba(255,255,255,0.92)",
-                    bordercolor: "rgba(239,68,68,0.14)",
-                    borderpad: 2,
-                    visible: true,
-                  },
-                  {
-                    x: 0.935,
-                    xref: "paper",
-                    y: stats.femaleMean,
-                    text: stats.femaleMean.toFixed(2),
-                    showarrow: false,
-                    xanchor: "left",
-                    yanchor: "middle",
-                    font: { size: 12, color: "#2563eb" },
-                    bgcolor: "rgba(255,255,255,0.92)",
-                    bordercolor: "rgba(37,99,235,0.14)",
-                    borderpad: 2,
-                    visible: true,
-                  },
-                ],
-                xaxis: {
-                  title: { text: "성별", standoff: 16 },
-                  showgrid: false,
-                  tickfont: { size: 14 },
-                },
-                yaxis: {
-                  title: { text: "체지방률", standoff: 14 },
-                  showgrid: true,
-                  gridcolor: "rgba(17,45,78,0.08)",
-                  tickfont: { size: 14 },
-                },
-                uirevision: `tf-compare-${showJitter ? "jitter" : "violin"}-${analysisMode}`,
+              layout={buildCompareLayout(analysisMode)}
+              config={{
+                displayModeBar: false,
+                responsive: true,
+                showTips: true,
+                doubleClick: "reset+autosize",
               }}
-              config={{ displayModeBar: false, responsive: true }}
               style={{ width: "100%", height: "100%" }}
             />
           </div>
 
-          <section className="tf-metric-grid">
-            <article className="tf-metric-card">
-              <span>남성 평균</span>
-              <strong>{stats.maleMean.toFixed(2)}</strong>
-            </article>
-            <article className="tf-metric-card">
-              <span>여성 평균</span>
-              <strong>{stats.femaleMean.toFixed(2)}</strong>
-            </article>
+          <section className={`tf-metric-grid ${analysisMode === "t" ? "is-three" : ""}`}>
+            {analysisMode === "t" ? (
+              <article className="tf-metric-card">
+                <span>남성과 여성의 평균 차이</span>
+                <strong>{meanDifference.toFixed(2)}</strong>
+              </article>
+            ) : (
+              <>
+                <article className="tf-metric-card">
+                  <span>집단간 평균제곱합</span>
+                  <strong>{stats.msBetween.toFixed(2)}</strong>
+                </article>
+                <article className="tf-metric-card">
+                  <span>집단내 평균제곱합</span>
+                  <strong>{stats.pooledVariance.toFixed(2)}</strong>
+                </article>
+              </>
+            )}
             <article className="tf-metric-card">
               <span>{analysisMode === "t" ? "t 통계량" : "F 통계량"}</span>
               <strong>{analysisMode === "t" ? stats.tValue.toFixed(2) : stats.fValue.toFixed(2)}</strong>
@@ -659,12 +983,74 @@ export default function TFAnalysisPage() {
                 },
                 uirevision: `tf-dist-${analysisMode}-${alpha}-${showStatisticScale}`,
               }}
-              config={{ displayModeBar: false, responsive: true }}
+              config={{
+                displayModeBar: false,
+                responsive: true,
+                showTips: true,
+                doubleClick: "reset+autosize",
+              }}
               style={{ width: "100%", height: "100%" }}
             />
           </div>
         </article>
       </section>
+
+      <div
+        ref={mobileFit.frameRef}
+        className="tf-mobile-fit-frame"
+        data-ready={mobileFit.ready ? "true" : "false"}
+        style={mobileFit.height ? { height: `${mobileFit.height}px` } : undefined}
+      >
+        <div
+          ref={mobileFit.contentRef}
+          className="tf-mobile-fit-inner"
+          style={{ transform: `scale(${mobileFit.scale})` }}
+        >
+          <section className="tf-mobile-stack">
+            {mobileSections.map((section) => (
+              <article key={section.key} className="rr-graph-card tf-mobile-section">
+                <div className="rr-graph-head tf-mobile-head">
+                  <div>
+                    <p className="panel-label">{section.groupTitle}</p>
+                    <h2 className="regswitch-title">{section.sectionTitle}</h2>
+                  </div>
+                </div>
+
+                <div className={section.metrics ? "tf-plot-wrap tf-mobile-plot" : "tf-small-plot tf-mobile-side-plot"}>
+                  <Plot
+                    data={section.data}
+                    layout={section.layout}
+                    config={{
+                      displayModeBar: false,
+                      responsive: true,
+                      showTips: true,
+                      doubleClick: "reset+autosize",
+                    }}
+                    style={{ width: "100%", height: "100%" }}
+                  />
+                </div>
+
+                {section.metrics ? (
+                  <section className={`tf-metric-grid tf-mobile-metric-grid ${section.metrics.length === 3 ? "is-three" : ""}`}>
+                    {section.metrics.map((metric) => (
+                      <article key={metric.label} className="tf-metric-card">
+                        <span>{metric.label}</span>
+                        <strong>{metric.value}</strong>
+                      </article>
+                    ))}
+                  </section>
+                ) : null}
+              </article>
+            ))}
+          </section>
+
+          <div className="tf-mobile-footer">
+            <Link className="secondary-button regswitch-home-button" href="/lab">
+              메인으로
+            </Link>
+          </div>
+        </div>
+      </div>
     </main>
   );
 }

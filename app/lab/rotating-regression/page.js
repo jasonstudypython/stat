@@ -92,18 +92,14 @@ function derivativeQuadratic(curve, x) {
 function residualStats(slope, intercept) {
   const predicted = X_VALUES.map((x) => slope * x + intercept);
   const residuals = Y_VALUES.map((y, index) => y - predicted[index]);
-  const squared = residuals.map((value) => value ** 2);
   const errorSum = residuals.reduce((sum, value) => sum + value, 0);
-  const rss = squared.reduce((sum, value) => sum + value, 0);
-  const absSum = residuals.reduce((sum, value) => sum + Math.abs(value), 0);
+  const rss = residuals.reduce((sum, value) => sum + value ** 2, 0);
 
   return {
     predicted,
     residuals,
-    squared,
     errorSum,
     rss,
-    absSum,
   };
 }
 
@@ -114,6 +110,33 @@ function scaleLinear(value, domainMin, domainMax, rangeMin, rangeMax) {
 
 function normalizeSignedZero(value) {
   return Math.abs(value) < 0.0000001 ? 0 : value;
+}
+
+function getNearestStage(currentSlope) {
+  return SLOPE_STATES.reduce((closest, state) => {
+    if (!closest) return state;
+    return Math.abs(state.slope - currentSlope) < Math.abs(closest.slope - currentSlope) ? state : closest;
+  }, null);
+}
+
+function buildRotatingState(currentSlope, optimal, rssCurve) {
+  const currentIntercept = optimal.yMean - currentSlope * optimal.xMean;
+  const currentStats = residualStats(currentSlope, currentIntercept);
+  const currentErrorSum = normalizeSignedZero(currentStats.errorSum);
+  const currentRss = evaluateQuadratic(rssCurve, currentSlope);
+  const tangentSlope = normalizeSignedZero(derivativeQuadratic(rssCurve, currentSlope));
+  const nearestStage = getNearestStage(currentSlope);
+  const showTangent = nearestStage ? Math.abs(nearestStage.slope - currentSlope) <= 0.04 : false;
+  const currentLabel = nearestStage && showTangent ? nearestStage.label : `m = ${currentSlope.toFixed(2)}`;
+
+  return {
+    currentIntercept,
+    currentErrorSum,
+    currentRss,
+    tangentSlope,
+    showTangent,
+    currentLabel,
+  };
 }
 
 function RegressionPlot({ slope, intercept, optimalSlope, optimalIntercept, xRange, yRange }) {
@@ -155,7 +178,7 @@ function RegressionPlot({ slope, intercept, optimalSlope, optimalIntercept, xRan
         </text>
       ))}
 
-      {[-1, 0, 1, 2, 3, 4, 5].map((value) => (
+      {[-2, -1, 0, 1, 2, 3, 4, 5].map((value) => (
         <text key={`yt-${value}`} x={left - 18} y={toY(value) + 6} textAnchor="end" className="rr-tick">
           {value}
         </text>
@@ -300,6 +323,42 @@ function RssPlot({ states, currentSlope, currentRss, tangentSlope, showTangent }
   );
 }
 
+function RotatingMetrics({ currentSlope, currentIntercept, currentErrorSum, currentRss, tangentSlope }) {
+  return (
+    <>
+      <section className="rr-metrics">
+        <article>
+          <span>회귀선의 기울기</span>
+          <strong>{currentSlope.toFixed(2)}</strong>
+        </article>
+        <article>
+          <span>현재 절편</span>
+          <strong>{currentIntercept.toFixed(2)}</strong>
+        </article>
+        <article>
+          <span>오차 합계</span>
+          <strong>{currentErrorSum.toFixed(2)}</strong>
+        </article>
+        <article>
+          <span>오차제곱합</span>
+          <strong>{currentRss.toFixed(2)}</strong>
+        </article>
+        <article>
+          <span>접선의 기울기</span>
+          <strong>{tangentSlope.toFixed(2)}</strong>
+        </article>
+      </section>
+
+      <section className="rr-metrics rr-metrics-single">
+        <article>
+          <span>현재 회귀식</span>
+          <strong>{`Y=${currentSlope.toFixed(2)} X + ${currentIntercept.toFixed(2)}`}</strong>
+        </article>
+      </section>
+    </>
+  );
+}
+
 export default function RotatingRegressionPage() {
   const [currentSlope, setCurrentSlope] = useState(1);
   const optimal = useMemo(() => fitOptimalLine(X_VALUES, Y_VALUES), []);
@@ -307,19 +366,9 @@ export default function RotatingRegressionPage() {
     () => quadraticFit(SLOPE_STATES.map((state) => state.slope), SLOPE_STATES.map((state) => state.rss)),
     []
   );
-  const currentIntercept = optimal.yMean - currentSlope * optimal.xMean;
-  const currentStats = residualStats(currentSlope, currentIntercept);
-  const currentErrorSum = normalizeSignedZero(currentStats.errorSum);
-  const currentRss = evaluateQuadratic(rssCurve, currentSlope);
-  const tangentSlope = normalizeSignedZero(derivativeQuadratic(rssCurve, currentSlope));
-  const nearestStage = SLOPE_STATES.reduce((closest, state) => {
-    if (!closest) return state;
-    return Math.abs(state.slope - currentSlope) < Math.abs(closest.slope - currentSlope) ? state : closest;
-  }, null);
-  const showTangent = nearestStage ? Math.abs(nearestStage.slope - currentSlope) <= 0.04 : false;
-  const currentLabel = nearestStage && showTangent ? nearestStage.label : `m = ${currentSlope.toFixed(2)}`;
   const xRange = [0.5, 3.5];
-  const yRange = [-1.5, 5.5];
+  const yRange = [-2.5, 5.5];
+  const currentState = buildRotatingState(currentSlope, optimal, rssCurve);
 
   return (
     <main className="rr-shell regswitch-shell rr-rotating-page">
@@ -330,7 +379,7 @@ export default function RotatingRegressionPage() {
         </div>
         <div className="lab-header-action-stack">
           <Link className="secondary-button regswitch-home-button" href="/lab">
-          메인으로
+            메인으로
           </Link>
           <button
             type="button"
@@ -342,7 +391,7 @@ export default function RotatingRegressionPage() {
                 [
                   { label: "x_value", value: (row) => row.x_value.toFixed(6) },
                   { label: "y_value", value: (row) => row.y_value.toFixed(6) },
-                ],
+                ]
               )
             }
           >
@@ -354,7 +403,7 @@ export default function RotatingRegressionPage() {
       <section className="rr-graphs">
         <article className="rr-graph-card">
           <div className="rr-graph-head">
-            <p className="panel-label">기울기별 회귀선</p>
+            <p className="panel-label">기울기 별 회귀선</p>
             <div className="rr-legend">
               <span className="is-optimal">최적 회귀선</span>
               <span className="is-current">현재 회귀선</span>
@@ -363,7 +412,7 @@ export default function RotatingRegressionPage() {
           </div>
           <RegressionPlot
             slope={currentSlope}
-            intercept={currentIntercept}
+            intercept={currentState.currentIntercept}
             optimalSlope={optimal.slope}
             optimalIntercept={optimal.intercept}
             xRange={xRange}
@@ -383,43 +432,20 @@ export default function RotatingRegressionPage() {
           <RssPlot
             states={SLOPE_STATES}
             currentSlope={currentSlope}
-            currentRss={currentRss}
-            tangentSlope={tangentSlope}
-            showTangent={showTangent}
+            currentRss={currentState.currentRss}
+            tangentSlope={currentState.tangentSlope}
+            showTangent={currentState.showTangent}
           />
         </article>
       </section>
 
-      <section className="rr-metrics">
-        <article>
-          <span>회귀선의 기울기</span>
-          <strong>{currentSlope.toFixed(2)}</strong>
-        </article>
-        <article>
-          <span>현재 절편</span>
-          <strong>{currentIntercept.toFixed(2)}</strong>
-        </article>
-        <article>
-          <span>{"오차 합계"}</span>
-          <strong>{currentErrorSum.toFixed(2)}</strong>
-        </article>
-        <article>
-          <span>오차제곱합 RSS</span>
-          <span>{"오차제곱합"}</span>
-          <strong>{currentRss.toFixed(2)}</strong>
-        </article>
-        <article>
-          <span>접선의 기울기</span>
-          <strong>{tangentSlope.toFixed(2)}</strong>
-        </article>
-      </section>
-
-      <section className="rr-metrics rr-metrics-single">
-        <article>
-          <span>현재 회귀식</span>
-          <strong>{`Y=${currentSlope.toFixed(2)} X + ${currentIntercept.toFixed(2)}`}</strong>
-        </article>
-      </section>
+      <RotatingMetrics
+        currentSlope={currentSlope}
+        currentIntercept={currentState.currentIntercept}
+        currentErrorSum={currentState.currentErrorSum}
+        currentRss={currentState.currentRss}
+        tangentSlope={currentState.tangentSlope}
+      />
 
       <section className="rr-stepper">
         <button
@@ -438,7 +464,7 @@ export default function RotatingRegressionPage() {
             value={currentSlope}
             onChange={(event) => setCurrentSlope(Number(event.target.value))}
           />
-          <strong>{currentLabel}</strong>
+          <strong>{currentState.currentLabel}</strong>
         </label>
         <button
           type="button"
@@ -446,6 +472,66 @@ export default function RotatingRegressionPage() {
         >
           다음 단계
         </button>
+      </section>
+
+      <section className="rr-rotating-mobile-live">
+        <section className="rr-graphs">
+          <article className="rr-graph-card">
+            <div className="rr-graph-head">
+              <p className="panel-label">기울기 별 회귀선</p>
+            </div>
+            <RegressionPlot
+              slope={currentSlope}
+              intercept={currentState.currentIntercept}
+              optimalSlope={optimal.slope}
+              optimalIntercept={optimal.intercept}
+              xRange={xRange}
+              yRange={yRange}
+            />
+          </article>
+
+          <article className="rr-graph-card">
+            <div className="rr-graph-head">
+              <p className="panel-label">오차의 변화</p>
+            </div>
+            <RssPlot
+              states={SLOPE_STATES}
+              currentSlope={currentSlope}
+              currentRss={currentState.currentRss}
+              tangentSlope={currentState.tangentSlope}
+              showTangent={currentState.showTangent}
+            />
+          </article>
+        </section>
+
+        <section className="rr-stepper rr-rotating-mobile-slider">
+          <label className="rr-step-slider">
+            <span>기울기 단계</span>
+            <input
+              type="range"
+              min="-1"
+              max="3"
+              step="0.01"
+              value={currentSlope}
+              onChange={(event) => setCurrentSlope(Number(event.target.value))}
+            />
+            <strong>{currentState.currentLabel}</strong>
+          </label>
+        </section>
+
+        <RotatingMetrics
+          currentSlope={currentSlope}
+          currentIntercept={currentState.currentIntercept}
+          currentErrorSum={currentState.currentErrorSum}
+          currentRss={currentState.currentRss}
+          tangentSlope={currentState.tangentSlope}
+        />
+
+        <div className="rr-rotating-mobile-footer">
+          <Link className="secondary-button regswitch-home-button" href="/lab">
+            메인으로
+          </Link>
+        </div>
       </section>
     </main>
   );

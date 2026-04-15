@@ -457,12 +457,20 @@ export default function SampleMeanDistributionPage() {
   const [step, setStep] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [confidenceLevel, setConfidenceLevel] = useState("none");
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
 
   const population = useMemo(() => createPopulation(populationType), [populationType]);
   const rounds = useMemo(
     () => createSamplingRounds(population, sampleSize, populationType),
     [population, populationType, sampleSize],
   );
+
+  useEffect(() => {
+    const updateViewport = () => setIsMobileViewport(window.innerWidth <= 820);
+    updateViewport();
+    window.addEventListener("resize", updateViewport);
+    return () => window.removeEventListener("resize", updateViewport);
+  }, []);
 
   useEffect(() => {
     setStep(0);
@@ -500,6 +508,118 @@ export default function SampleMeanDistributionPage() {
   const theoreticalSe = populationStd / Math.sqrt(sampleSize);
   const empiricalSe = standardDeviation(sampleMeans);
   const sampleMeanCenter = meanOfMeans ?? populationMean;
+
+  if (isMobileViewport) {
+    return (
+      <main className="rr-shell samplemean-shell samplemean-mobile-shell">
+        <section className="samplemean-mobile-controls">
+          <article className="rr-step-slider">
+            <span>모집단모양</span>
+            <select
+              className="samplemean-select"
+              value={populationType}
+              onChange={(event) => setPopulationType(event.target.value)}
+            >
+              {POPULATION_OPTIONS.map((option) => (
+                <option key={option.key} value={option.key}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </article>
+
+          <article className="rr-step-slider">
+            <span>표집크기</span>
+            <select
+              className="samplemean-select"
+              value={String(sampleSize)}
+              onChange={(event) => setSampleSize(Number(event.target.value))}
+            >
+              {SAMPLE_SIZES.map((size) => (
+                <option key={size} value={String(size)}>
+                  n={size}
+                </option>
+              ))}
+            </select>
+          </article>
+        </section>
+
+        <section className="samplemean-mobile-stack">
+          <PanelFrame
+            title="모집단 분포"
+            subtitle={`성인 남성 100명의 키 분포 · 평균 ${formatNumber(populationMean, 2)} · 표준편차 ${formatNumber(populationStd, 2)}`}
+          >
+            <PopulationPlot population={population} highlightedIndices={highlightedIndices} />
+          </PanelFrame>
+
+          <section className="samplemean-sample-strip">
+            <CurrentSampleStrip sampleValues={currentRound ? currentRound.values : []} sampleSize={sampleSize} />
+          </section>
+
+          <PanelFrame title="표본평균의 분포" subtitle={`반복 ${step}회 누적 · 95% 신뢰수준`}>
+            <div className="samplemean-distribution-wrap">
+              <SampleMeanDistributionPlot
+                rounds={rounds}
+                step={step}
+                sampleMeanCenter={sampleMeanCenter}
+                theoreticalSe={theoreticalSe}
+                baseStackMax={populationBaseStackMax}
+                confidenceLevel="95"
+              />
+            </div>
+          </PanelFrame>
+
+          <section className="samplemean-mobile-run-row">
+            <article className="regswitch-slider-card samplemean-slider-card samplemean-mobile-run-card">
+              <div className="regswitch-slider-head">
+                <span>반복 표집</span>
+                <strong>{step}회</strong>
+              </div>
+              <div className="samplemean-mobile-run-inline">
+                <input
+                  type="range"
+                  min="0"
+                  max={String(MAX_ROUNDS)}
+                  value={step}
+                  onChange={(event) => setStep(Number(event.target.value))}
+                />
+                <button type="button" className={isPlaying ? "active" : ""} onClick={() => setIsPlaying((value) => !value)}>
+                  {isPlaying ? "정지" : "재생"}
+                </button>
+              </div>
+            </article>
+          </section>
+
+          <article className="samplemean-info-card samplemean-mobile-info-card">
+            <div className="samplemean-info-grid samplemean-mobile-info-grid">
+              <article className="samplemean-info-item">
+                <span>모평균</span>
+                <strong>{formatNumber(populationMean, 2)}</strong>
+              </article>
+              <article className="samplemean-info-item">
+                <span>표본평균분포의 평균</span>
+                <strong>{meanOfMeans === null ? "-" : formatNumber(meanOfMeans, 2)}</strong>
+              </article>
+              <article className="samplemean-info-item">
+                <span>이론적 표준오차</span>
+                <strong>{formatNumber(theoreticalSe, 2)}</strong>
+              </article>
+              <article className="samplemean-info-item">
+                <span>경험적 표준오차</span>
+                <strong>{formatNumber(empiricalSe, 2)}</strong>
+              </article>
+            </div>
+          </article>
+        </section>
+
+        <div className="samplemean-mobile-footer">
+          <Link className="secondary-button regswitch-home-button" href="/lab">
+            메인으로
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="rr-shell samplemean-shell">

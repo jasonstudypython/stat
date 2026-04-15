@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { downloadCsv } from "../_shared/csv";
+import { useMobileFitScale } from "../_shared/useMobileFitScale";
 import {
   createSeededRandom,
   formatNumber,
@@ -29,6 +30,12 @@ const STEP_OPTIONS = [
   { key: "xToM", label: "독립변수(X) → 매개변수(M)" },
   { key: "xToY", label: "독립변수(X) → 종속변수(Y)" },
   { key: "mediation", label: "독립변수(X), 매개변수(M) → 종속변수(Y)" },
+];
+
+const MOBILE_STEP_SECTIONS = [
+  { key: "xToM", groupTitle: "1단계", sectionTitle: "독립변수(X) → 매개변수(M)" },
+  { key: "xToY", groupTitle: "2단계", sectionTitle: "독립변수(X) → 종속변수(Y)" },
+  { key: "mediation", groupTitle: "3단계", sectionTitle: "독립변수(X), 매개변수(M) → 종속변수(Y)" },
 ];
 
 const MEDIATION_CAMERA_EYE = { x: 0.08, y: -1.58, z: -0.15 };
@@ -480,40 +487,52 @@ function buildStepSummaryRows(scenes) {
 
 export default function MediationEffectPage() {
   const scenes = useMemo(() => buildMediationScenes(), []);
+  const mobileFit = useMobileFitScale(820, 560);
   const [step, setStep] = useState("xToM");
-
-  const activePlot =
-    step === "xToM"
-      ? buildSimplePlot(scenes.rows, scenes.xToM, "x", "m", {
-        x: "독립변수 (X)",
-        y: "매개변수 (M)",
-        title: "독립변수(X) → 매개변수(M)",
-      })
-      : step === "xToY"
-        ? buildSimplePlot(scenes.rows, scenes.xToY, "x", "y", {
-          x: "독립변수 (X)",
-          y: "종속변수 (Y)",
-          title: "독립변수(X) → 종속변수(Y)",
-        })
-        : buildMediationPlot(scenes.mediation, scenes.rows);
-
-  const activeModelRows = buildModelRows(step, scenes);
-  const activeCoefficientRows = buildCoefficientRows(step, scenes);
   const allStepSummaryRows = buildStepSummaryRows(scenes);
-  const stepSummaryRows =
-      step === "xToM"
-        ? allStepSummaryRows.slice(0, 1)
-        : step === "xToY"
-          ? allStepSummaryRows.slice(0, 2)
-          : allStepSummaryRows;
-  const modelLabels = activeModelRows.map((row) => row.label);
-  const modelValues = activeModelRows.map((row) => row.value);
-  const activeTitle =
-    step === "xToM"
-      ? "독립변수가 매개변수에 미치는 영향"
-      : step === "xToY"
-        ? "독립변수가 종속변수에 미치는 영향"
-        : "매개효과";
+  const buildStepState = (stepKey) => {
+    const plot =
+      stepKey === "xToM"
+        ? buildSimplePlot(scenes.rows, scenes.xToM, "x", "m", {
+            x: "독립변수 (X)",
+            y: "매개변수 (M)",
+            title: "독립변수(X) → 매개변수(M)",
+          })
+        : stepKey === "xToY"
+          ? buildSimplePlot(scenes.rows, scenes.xToY, "x", "y", {
+              x: "독립변수 (X)",
+              y: "종속변수 (Y)",
+              title: "독립변수(X) → 종속변수(Y)",
+            })
+          : buildMediationPlot(scenes.mediation, scenes.rows);
+
+    const modelRows = buildModelRows(stepKey, scenes);
+    const coefficientRows = buildCoefficientRows(stepKey, scenes);
+    const summaryRows =
+      stepKey === "xToM" ? allStepSummaryRows.slice(0, 1) : stepKey === "xToY" ? allStepSummaryRows.slice(0, 2) : allStepSummaryRows;
+    const title =
+      stepKey === "xToM"
+        ? "독립변수가 매개변수에 미치는 영향"
+        : stepKey === "xToY"
+          ? "독립변수가 종속변수에 미치는 영향"
+          : "매개효과";
+
+    return {
+      plot,
+      modelRows,
+      coefficientRows,
+      summaryRows,
+      modelLabels: modelRows.map((row) => row.label),
+      modelValues: modelRows.map((row) => row.value),
+      title,
+    };
+  };
+
+  const activeState = buildStepState(step);
+  const mobileSections = MOBILE_STEP_SECTIONS.map((section) => ({
+    ...section,
+    state: buildStepState(section.key),
+  }));
 
   return (
     <main className="rr-shell multireg2-shell">
@@ -547,23 +566,25 @@ export default function MediationEffectPage() {
           <div className="rr-graph-head multireg2-stage-head">
             <div>
               <p className="panel-label">Graph</p>
-              <h2>{activeTitle}</h2>
+              <h2>{activeState.title}</h2>
             </div>
           </div>
 
           <div className="multireg2-plot-wrap mediation-plot-wrap">
             <Plot
-              data={activePlot.data}
+              data={activeState.plot.data}
               layout={{
                 font: {
                   family: "Pretendard, Noto Sans KR, sans-serif",
                   color: "#112d4e",
                   size: 16,
                 },
-                ...activePlot.layout,
+                ...activeState.plot.layout,
               }}
               config={{
                 responsive: true,
+                showTips: true,
+                doubleClick: "reset+autosize",
                 displaylogo: false,
                 modeBarButtonsToRemove: ["lasso2d", "select2d", "lasso3d"],
               }}
@@ -588,20 +609,20 @@ export default function MediationEffectPage() {
                 <p className="mediation-results-label">모형</p>
                 <table
                   className={`multireg2-table multireg2-model-table modlab-model-table ${
-                    activeModelRows.length === 2 ? "is-two-column" : ""
+                    activeState.modelRows.length === 2 ? "is-two-column" : ""
                   }`}
                 >
                   <thead>
                     <tr>
-                      {modelLabels.map((label) => (
+                      {activeState.modelLabels.map((label) => (
                         <th key={label}>{label}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     <tr>
-                      {modelValues.map((value, index) => (
-                        <td key={`${modelLabels[index]}-${value}`}>{value}</td>
+                      {activeState.modelValues.map((value, index) => (
+                        <td key={`${activeState.modelLabels[index]}-${value}`}>{value}</td>
                       ))}
                     </tr>
                   </tbody>
@@ -621,7 +642,7 @@ export default function MediationEffectPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {activeCoefficientRows.map((row) => (
+                  {activeState.coefficientRows.map((row) => (
                     <tr key={row.name}>
                       <td>{row.name}</td>
                       <td>{row.coef}</td>
@@ -648,7 +669,7 @@ export default function MediationEffectPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {stepSummaryRows.map((row, index) => (
+                  {activeState.summaryRows.map((row, index) => (
                     <tr key={`${row.category}-${row.variable}-${index}`}>
                       {row.groupSize === 2 && row.variable === "X" ? (
                         <>
@@ -675,6 +696,152 @@ export default function MediationEffectPage() {
           </section>
         </aside>
       </section>
+
+      <div
+        ref={mobileFit.frameRef}
+        className="mediation-mobile-fit-frame"
+        data-ready={mobileFit.ready ? "true" : "false"}
+        style={mobileFit.height ? { height: `${mobileFit.height}px` } : undefined}
+      >
+        <div
+          ref={mobileFit.contentRef}
+          className="mediation-mobile-fit-inner"
+          style={{ transform: `scale(${mobileFit.scale})` }}
+        >
+          <section className="mediation-mobile-stack">
+            {mobileSections.map((section) => (
+              <article key={section.key} className="rr-graph-card mediation-mobile-section">
+                <div className="rr-graph-head multireg2-stage-head mediation-mobile-head">
+                  <div>
+                    <p className="panel-label">{section.groupTitle}</p>
+                    <h2>{section.sectionTitle}</h2>
+                  </div>
+                </div>
+
+                <div className="multireg2-plot-wrap mediation-plot-wrap mediation-mobile-plot">
+                  <Plot
+                    data={section.state.plot.data}
+                    layout={{
+                      font: {
+                        family: "Pretendard, Noto Sans KR, sans-serif",
+                        color: "#112d4e",
+                        size: 14,
+                      },
+                      ...section.state.plot.layout,
+                      margin: { l: 36, r: 14, t: 48, b: 36 },
+                    }}
+                    config={{
+                      responsive: true,
+                      showTips: true,
+                      doubleClick: "reset+autosize",
+                      displaylogo: false,
+                      displayModeBar: false,
+                    }}
+                    style={{ width: "100%", height: "100%" }}
+                  />
+                </div>
+
+                <section className="rr-step-slider multireg2-value-card multireg2-results-card mediation-mobile-cards">
+                  <div className="mediation-results-block">
+                    <p className="mediation-results-label">모형</p>
+                    <table
+                      className={`multireg2-table multireg2-model-table modlab-model-table ${
+                        section.state.modelRows.length === 2 ? "is-two-column" : ""
+                      }`}
+                    >
+                      <thead>
+                        <tr>
+                          {section.state.modelLabels.map((label) => (
+                            <th key={label}>{label}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          {section.state.modelValues.map((value, index) => (
+                            <td key={`${section.state.modelLabels[index]}-${value}`}>{value}</td>
+                          ))}
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="mediation-results-block">
+                    <p className="mediation-results-label">회귀계수</p>
+                    <table className="multireg2-table multireg2-coef-table">
+                      <thead>
+                        <tr>
+                          <th>구분</th>
+                          <th>회귀계수</th>
+                          <th>표준오차</th>
+                          <th>t</th>
+                          <th>p</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {section.state.coefficientRows.map((row) => (
+                          <tr key={row.name}>
+                            <td>{row.name}</td>
+                            <td>{row.coef}</td>
+                            <td>{row.stderr}</td>
+                            <td>{row.t}</td>
+                            <td>{row.p}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="mediation-results-block mediation-results-block-summary">
+                    <p className="mediation-results-label">단계별 분석</p>
+                    <table className="multireg2-table multireg2-coef-table mediation-summary-table">
+                      <thead>
+                        <tr>
+                          <th>구분</th>
+                          <th>R제곱</th>
+                          <th>F/p값</th>
+                          <th>변수</th>
+                          <th>회귀계수</th>
+                          <th>t/p값</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {section.state.summaryRows.map((row, index) => (
+                          <tr key={`${row.category}-${row.variable}-${index}`}>
+                            {row.groupSize === 2 && row.variable === "X" ? (
+                              <>
+                                <td rowSpan={2}>{row.category}</td>
+                                <td rowSpan={2}>{row.r2}</td>
+                                <td rowSpan={2}>{row.fp}</td>
+                              </>
+                            ) : null}
+                            {row.groupSize === 1 ? (
+                              <>
+                                <td>{row.category}</td>
+                                <td>{row.r2}</td>
+                                <td>{row.fp}</td>
+                              </>
+                            ) : null}
+                            <td>{row.variable}</td>
+                            <td>{row.coef}</td>
+                            <td>{row.tp}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              </article>
+            ))}
+          </section>
+
+          <div className="mediation-mobile-footer">
+            <Link className="secondary-button" href="/lab">
+              메인으로
+            </Link>
+          </div>
+        </div>
+      </div>
     </main>
   );
 }

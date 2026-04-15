@@ -1,8 +1,57 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { downloadCsv } from "../_shared/csv";
+import { useMobileFitScale } from "../_shared/useMobileFitScale";
+
+const MOBILE_SCATTER_SECTIONS = [
+  {
+    id: "regression",
+    groupTitle: "단순 회귀분석",
+    sectionTitle: "회귀선",
+    toggles: {
+      showObservations: true,
+      showXSpread: true,
+      showXMeanLine: true,
+      showYMeanLine: true,
+      showRegressionLine: true,
+      showPrediction: false,
+      showSlopeArrows: false,
+      progressValue: 0,
+    },
+  },
+  {
+    id: "prediction",
+    groupTitle: "단순 회귀분석",
+    sectionTitle: "예측값",
+    toggles: {
+      showObservations: true,
+      showXSpread: true,
+      showXMeanLine: true,
+      showYMeanLine: true,
+      showRegressionLine: true,
+      showPrediction: true,
+      showSlopeArrows: false,
+      progressValue: 56,
+    },
+  },
+  {
+    id: "slope",
+    groupTitle: "단순 회귀분석",
+    sectionTitle: "회귀선의 기울기",
+    toggles: {
+      showObservations: true,
+      showXSpread: true,
+      showXMeanLine: true,
+      showYMeanLine: true,
+      showRegressionLine: true,
+      showPrediction: true,
+      showSlopeArrows: true,
+      progressValue: 56,
+    },
+  },
+];
 
 function createSeededRandom(seed) {
   let state = seed >>> 0;
@@ -80,25 +129,21 @@ function scale(value, domainMin, domainMax, rangeMin, rangeMax) {
   return rangeMin + ((value - domainMin) / (domainMax - domainMin || 1)) * (rangeMax - rangeMin);
 }
 
-export default function BasicStatsScatterBridgePage() {
-  const [showObservations, setShowObservations] = useState(true);
-  const [showXSpread, setShowXSpread] = useState(false);
-  const [showXMeanLine, setShowXMeanLine] = useState(false);
-  const [showYMeanLine, setShowYMeanLine] = useState(false);
-  const [showRegressionLine, setShowRegressionLine] = useState(false);
-  const [showPrediction, setShowPrediction] = useState(false);
-  const [showSlopeArrows, setShowSlopeArrows] = useState(false);
-  const [progressValue, setProgressValue] = useState(0);
-
-  const points = useMemo(() => createStudyDataset(), []);
-  const stats = useMemo(() => {
-    const regression = fitSimpleRegression(points);
-    return {
-      ...regression,
-      xStd: standardDeviation(points.map((point) => point.x)),
-      yStd: standardDeviation(points.map((point) => point.y)),
-    };
-  }, [points]);
+function ScatterBridgeFigure({
+  points,
+  stats,
+  showObservations,
+  showXSpread,
+  showXMeanLine,
+  showYMeanLine,
+  showRegressionLine,
+  showPrediction,
+  showSlopeArrows,
+  progressValue,
+}) {
+  const svgId = useId().replace(/:/g, "");
+  const rightArrowId = `${svgId}-arrow-right`;
+  const upArrowId = `${svgId}-arrow-up`;
 
   const xMin = 0;
   const yMin = 68;
@@ -123,32 +168,345 @@ export default function BasicStatsScatterBridgePage() {
   const predictionPointX = scale(predictionX, xMin, xMax, plotLeft, plotRight);
   const predictionPointY = scale(predictionY, yMin, yMax, plotBottom, plotTop);
 
-  const stepArrows = useMemo(() => {
-    const maxWholeHour = Math.min(Math.floor(lineX2 - 1), Math.floor(xMax - 1));
-    return Array.from({ length: Math.max(maxWholeHour + 1, 0) }, (_, hour) => {
-      const xStart = hour;
-      const xEnd = hour + 1;
-      const yStart = stats.intercept + stats.slope * xStart;
-      const yEnd = stats.intercept + stats.slope * xEnd;
-      return {
-        hour,
-        xStart,
-        xEnd,
-        yStart,
-        yEnd,
-        sx: scale(xStart, xMin, xMax, plotLeft, plotRight),
-        ex: scale(xEnd, xMin, xMax, plotLeft, plotRight),
-        sy: scale(yStart, yMin, yMax, plotBottom, plotTop),
-        ey: scale(yEnd, yMin, yMax, plotBottom, plotTop),
-      };
-    });
-  }, [lineX2, plotBottom, plotLeft, plotRight, plotTop, stats.intercept, stats.slope, xMax, yMax, yMin]);
+  const highlightedStep = useMemo(() => {
+    const xStart = 5;
+    const xEnd = 6;
+    const yStart = stats.intercept + stats.slope * xStart;
+    const yEnd = stats.intercept + stats.slope * xEnd;
+    return {
+      sx: scale(xStart, xMin, xMax, plotLeft, plotRight),
+      ex: scale(xEnd, xMin, xMax, plotLeft, plotRight),
+      sy: scale(yStart, yMin, yMax, plotBottom, plotTop),
+      ey: scale(yEnd, yMin, yMax, plotBottom, plotTop),
+    };
+  }, [plotBottom, plotLeft, plotRight, plotTop, stats.intercept, stats.slope, xMax, yMax, yMin]);
 
-  const highlightedStep = stepArrows[Math.min(3, Math.max(stepArrows.length - 1, 0))];
+  return (
+    <svg
+      viewBox="0 0 1040 720"
+      className="scatter-bridge-svg"
+      role="img"
+      aria-label="공부시간과 성적 산점도"
+    >
+      <defs>
+        <marker
+          id={rightArrowId}
+          viewBox="0 0 10 10"
+          refX="9"
+          refY="5"
+          markerWidth="8"
+          markerHeight="8"
+          orient="0"
+        >
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#d97706" />
+        </marker>
+        <marker
+          id={upArrowId}
+          viewBox="0 0 10 10"
+          refX="5"
+          refY="1"
+          markerWidth="8"
+          markerHeight="8"
+          orient="0"
+        >
+          <path d="M 0 10 L 5 0 L 10 10 z" fill="#d97706" />
+        </marker>
+      </defs>
+
+      <rect
+        x={plotLeft - 26}
+        y={plotTop - 18}
+        width={plotRight - plotLeft + 52}
+        height={plotBottom - plotTop + 34}
+        rx="34"
+        className="scatter-bridge-backdrop"
+      />
+
+      {Array.from({ length: 6 }, (_, index) => (
+        <line
+          key={`h-${index}`}
+          x1={plotLeft}
+          y1={plotTop + index * ((plotBottom - plotTop) / 6)}
+          x2={plotRight}
+          y2={plotTop + index * ((plotBottom - plotTop) / 6)}
+          className="scatter-bridge-grid"
+        />
+      ))}
+
+      {showXSpread
+        ? Array.from({ length: Math.floor(xMax) + 1 }, (_, index) => (
+            <line
+              key={`v-${index}`}
+              x1={scale(index, xMin, xMax, plotLeft, plotRight)}
+              y1={plotTop}
+              x2={scale(index, xMin, xMax, plotLeft, plotRight)}
+              y2={plotBottom}
+              className="scatter-bridge-grid"
+            />
+          ))
+        : null}
+
+      <line x1={plotLeft} y1={plotBottom} x2={plotRight} y2={plotBottom} className="scatter-bridge-axis" />
+      <line x1={plotLeft} y1={plotTop} x2={plotLeft} y2={plotBottom} className="scatter-bridge-axis" />
+
+      {showXMeanLine ? (
+        <>
+          <line x1={meanX} y1={plotTop} x2={meanX} y2={plotBottom} className="scatter-bridge-mean-line" />
+          <text x={meanX + 12} y={plotTop + 24} className="scatter-bridge-mean-text">
+            X 평균
+          </text>
+        </>
+      ) : null}
+
+      {showYMeanLine ? (
+        <>
+          <line x1={plotLeft} y1={meanY} x2={plotRight} y2={meanY} className="scatter-bridge-mean-line" />
+          <text x={plotLeft + 16} y={meanY - 12} className="scatter-bridge-mean-text">
+            Y 평균
+          </text>
+        </>
+      ) : null}
+
+      {showRegressionLine ? (
+        <>
+          <line
+            x1={scale(lineX1, xMin, xMax, plotLeft, plotRight)}
+            y1={scale(lineY1, yMin, yMax, plotBottom, plotTop)}
+            x2={scale(lineX2, xMin, xMax, plotLeft, plotRight)}
+            y2={scale(lineY2, yMin, yMax, plotBottom, plotTop)}
+            className="scatter-bridge-regression"
+          />
+          {showXSpread
+            ? points.map((point) => {
+                const x = scale(point.x, xMin, xMax, plotLeft, plotRight);
+                const predictedY = stats.intercept + stats.slope * point.x;
+                return (
+                  <line
+                    key={`residual-${point.id}`}
+                    x1={x}
+                    y1={scale(point.y, yMin, yMax, plotBottom, plotTop)}
+                    x2={x}
+                    y2={scale(predictedY, yMin, yMax, plotBottom, plotTop)}
+                    className="scatter-bridge-residual"
+                  />
+                );
+              })
+            : null}
+        </>
+      ) : null}
+
+      {showSlopeArrows && showRegressionLine && showXSpread && highlightedStep ? (
+        <g>
+          <line
+            x1={highlightedStep.sx}
+            y1={highlightedStep.sy}
+            x2={highlightedStep.ex - 6}
+            y2={highlightedStep.sy}
+            className="scatter-bridge-step-arrow"
+            markerEnd={`url(#${rightArrowId})`}
+          />
+          <line
+            x1={highlightedStep.ex}
+            y1={highlightedStep.sy}
+            x2={highlightedStep.ex}
+            y2={highlightedStep.ey}
+            className="scatter-bridge-step-arrow"
+            markerEnd={`url(#${upArrowId})`}
+          />
+        </g>
+      ) : null}
+
+      {showSlopeArrows && showRegressionLine && showXSpread && highlightedStep ? (
+        <text
+          x={highlightedStep.ex + 12}
+          y={(highlightedStep.sy + highlightedStep.ey) / 2 + 6}
+          className="scatter-bridge-step-label"
+        >
+          {`${stats.slope.toFixed(2)}점`}
+        </text>
+      ) : null}
+
+      {showObservations
+        ? points.map((point) => {
+            const x = showXSpread ? scale(point.x, xMin, xMax, plotLeft, plotRight) : point.yOnlyX;
+            const y = scale(point.y, yMin, yMax, plotBottom, plotTop);
+
+            return (
+              <circle
+                key={point.id}
+                cx={x}
+                cy={y}
+                r="8.5"
+                className="scatter-bridge-dot"
+                style={{ transition: "cx 700ms ease, cy 700ms ease, opacity 220ms ease" }}
+              />
+            );
+          })
+        : null}
+
+      {showPrediction && showXSpread ? (
+        <circle
+          cx={predictionPointX}
+          cy={predictionPointY}
+          r="12"
+          className="scatter-bridge-prediction-dot"
+        />
+      ) : null}
+
+      {showXSpread
+        ? Array.from({ length: Math.floor(xMax) + 1 }, (_, index) => (
+            <text
+              key={`x-tick-${index}`}
+              x={scale(index, xMin, xMax, plotLeft, plotRight)}
+              y={plotBottom + 34}
+              textAnchor="middle"
+              className="scatter-bridge-tick"
+            >
+              {index}
+            </text>
+          ))
+        : null}
+
+      {[70, 75, 80, 85, 90, 95, 100].map((value) => (
+        <text
+          key={`y-tick-${value}`}
+          x={plotLeft - 22}
+          y={scale(value, yMin, yMax, plotBottom, plotTop) + 6}
+          textAnchor="end"
+          className="scatter-bridge-tick"
+        >
+          {value}
+        </text>
+      ))}
+
+      {showXSpread ? (
+        <text x={(plotLeft + plotRight) / 2} y="712" textAnchor="middle" className="scatter-bridge-label">
+          공부시간 (시간)
+        </text>
+      ) : null}
+      <text
+        x="48"
+        y={(plotTop + plotBottom) / 2}
+        textAnchor="middle"
+        className="scatter-bridge-label"
+        transform={`rotate(-90 48 ${(plotTop + plotBottom) / 2})`}
+      >
+        성적
+      </text>
+    </svg>
+  );
+}
+
+function ScatterBridgeSummaryPanel({ stats }) {
+  return (
+    <section className="rr-step-slider regswitch-value-card scatter-bridge-panel">
+      <span>요약 정보</span>
+      <div className="regswitch-value-grid">
+        <div>
+          <small>성적 평균</small>
+          <strong>{stats.yMean.toFixed(2)}점</strong>
+        </div>
+        <div>
+          <small>성적 표준편차</small>
+          <strong>{stats.yStd.toFixed(2)}점</strong>
+        </div>
+        <div>
+          <small>공부시간 평균</small>
+          <strong>{stats.xMean.toFixed(2)}시간</strong>
+        </div>
+        <div>
+          <small>공부시간 표준편차</small>
+          <strong>{stats.xStd.toFixed(2)}시간</strong>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ScatterBridgePredictionPanel({ stats, predictionX }) {
+  const predictionY = stats.intercept + stats.slope * predictionX;
+
+  return (
+    <section className="rr-step-slider regswitch-value-card scatter-bridge-panel">
+      <span>예측값 위치</span>
+      <div className="regswitch-value-grid">
+        <div>
+          <small>공부시간 X</small>
+          <strong>{predictionX.toFixed(2)}시간</strong>
+        </div>
+        <div>
+          <small>예측 성적</small>
+          <strong>{predictionY.toFixed(2)}점</strong>
+        </div>
+      </div>
+      <p>성적 = β₀ + β₁ × 공부시간</p>
+      <p className="regswitch-equation-value">
+        {`${predictionY.toFixed(2)} = ${stats.intercept.toFixed(2)} + ${stats.slope.toFixed(2)}×${predictionX.toFixed(2)}`}
+      </p>
+    </section>
+  );
+}
+
+function ScatterBridgeSlopePanel({ stats }) {
+  return (
+    <section className="rr-step-slider regswitch-value-card scatter-bridge-panel">
+      <span>회귀선의 기울기</span>
+      <div className="regswitch-value-grid">
+        <div>
+          <small>기울기 값</small>
+          <strong>{stats.slope.toFixed(2)}점</strong>
+        </div>
+        <div>
+          <small>해석</small>
+          <strong>{`공부시간 1시간 증가 시 성적은 ${stats.slope.toFixed(2)}점 증가`}</strong>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function renderMobileScatterPanel(sectionId, stats, predictionX) {
+  if (sectionId === "regression") {
+    return <ScatterBridgeSummaryPanel stats={stats} />;
+  }
+
+  if (sectionId === "prediction") {
+    return <ScatterBridgePredictionPanel stats={stats} predictionX={predictionX} />;
+  }
+
+  return <ScatterBridgeSlopePanel stats={stats} />;
+}
+
+export default function BasicStatsScatterBridgePage() {
+  const mobileFit = useMobileFitScale(820, 560);
+  const [showObservations, setShowObservations] = useState(true);
+  const [showXSpread, setShowXSpread] = useState(false);
+  const [showXMeanLine, setShowXMeanLine] = useState(false);
+  const [showYMeanLine, setShowYMeanLine] = useState(false);
+  const [showRegressionLine, setShowRegressionLine] = useState(false);
+  const [showPrediction, setShowPrediction] = useState(false);
+  const [showSlopeArrows, setShowSlopeArrows] = useState(false);
+  const [progressValue, setProgressValue] = useState(0);
+  const [mobilePredictionProgress, setMobilePredictionProgress] = useState(56);
+
+  const points = useMemo(() => createStudyDataset(), []);
+  const stats = useMemo(() => {
+    const regression = fitSimpleRegression(points);
+    return {
+      ...regression,
+      xStd: standardDeviation(points.map((point) => point.x)),
+      yStd: standardDeviation(points.map((point) => point.y)),
+    };
+  }, [points]);
+
+  const xAtScore100 = (100 - stats.intercept) / stats.slope;
+  const predictionX = (progressValue / 100) * xAtScore100;
+  const predictionY = stats.intercept + stats.slope * predictionX;
+  const mobilePredictionX = (mobilePredictionProgress / 100) * xAtScore100;
 
   const toggleItems = [
     {
-      label: "관측값",
+      label: "Y 데이터",
       active: showObservations,
       kind: "dot",
       onClick: () => setShowObservations((value) => !value),
@@ -184,7 +542,7 @@ export default function BasicStatsScatterBridgePage() {
       onClick: () => setShowPrediction((value) => !value),
     },
     {
-      label: "1시간 증가량",
+      label: "회귀선의 기울기",
       active: showSlopeArrows,
       kind: "step",
       onClick: () => setShowSlopeArrows((value) => !value),
@@ -200,7 +558,7 @@ export default function BasicStatsScatterBridgePage() {
         </div>
         <div className="lab-header-action-stack">
           <Link className="secondary-button regswitch-home-button" href="/lab">
-          메인으로
+            메인으로
           </Link>
           <button
             type="button"
@@ -242,220 +600,18 @@ export default function BasicStatsScatterBridgePage() {
           </div>
 
           <div className="scatter-bridge-plot-wrap">
-            <svg
-              viewBox="0 0 1040 720"
-              className="scatter-bridge-svg"
-              role="img"
-              aria-label="공부시간과 성적 산점도"
-            >
-              <defs>
-                <marker
-                  id="scatter-bridge-arrow-right"
-                  viewBox="0 0 10 10"
-                  refX="9"
-                  refY="5"
-                  markerWidth="8"
-                  markerHeight="8"
-                  orient="0"
-                >
-                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#d97706" />
-                </marker>
-                <marker
-                  id="scatter-bridge-arrow-up"
-                  viewBox="0 0 10 10"
-                  refX="5"
-                  refY="1"
-                  markerWidth="8"
-                  markerHeight="8"
-                  orient="0"
-                >
-                  <path d="M 0 10 L 5 0 L 10 10 z" fill="#d97706" />
-                </marker>
-              </defs>
-
-              <rect
-                x={plotLeft - 26}
-                y={plotTop - 18}
-                width={plotRight - plotLeft + 52}
-                height={plotBottom - plotTop + 34}
-                rx="34"
-                className="scatter-bridge-backdrop"
-              />
-
-              {Array.from({ length: 6 }, (_, index) => (
-                <line
-                  key={`h-${index}`}
-                  x1={plotLeft}
-                  y1={plotTop + index * ((plotBottom - plotTop) / 6)}
-                  x2={plotRight}
-                  y2={plotTop + index * ((plotBottom - plotTop) / 6)}
-                  className="scatter-bridge-grid"
-                />
-              ))}
-
-              {showXSpread
-                ? Array.from({ length: Math.floor(xMax) + 1 }, (_, index) => (
-                    <line
-                      key={`v-${index}`}
-                      x1={scale(index, xMin, xMax, plotLeft, plotRight)}
-                      y1={plotTop}
-                      x2={scale(index, xMin, xMax, plotLeft, plotRight)}
-                      y2={plotBottom}
-                      className="scatter-bridge-grid"
-                    />
-                  ))
-                : null}
-
-              <line x1={plotLeft} y1={plotBottom} x2={plotRight} y2={plotBottom} className="scatter-bridge-axis" />
-              <line x1={plotLeft} y1={plotTop} x2={plotLeft} y2={plotBottom} className="scatter-bridge-axis" />
-
-              {showXMeanLine ? (
-                <>
-                  <line x1={meanX} y1={plotTop} x2={meanX} y2={plotBottom} className="scatter-bridge-mean-line" />
-                  <text x={meanX + 12} y={plotTop + 24} className="scatter-bridge-mean-text">
-                    X 평균
-                  </text>
-                </>
-              ) : null}
-
-              {showYMeanLine ? (
-                <>
-                  <line x1={plotLeft} y1={meanY} x2={plotRight} y2={meanY} className="scatter-bridge-mean-line" />
-                  <text x={plotLeft + 16} y={meanY - 12} className="scatter-bridge-mean-text">
-                    Y 평균
-                  </text>
-                </>
-              ) : null}
-
-              {showRegressionLine ? (
-                <>
-                  <line
-                    x1={scale(lineX1, xMin, xMax, plotLeft, plotRight)}
-                    y1={scale(lineY1, yMin, yMax, plotBottom, plotTop)}
-                    x2={scale(lineX2, xMin, xMax, plotLeft, plotRight)}
-                    y2={scale(lineY2, yMin, yMax, plotBottom, plotTop)}
-                    className="scatter-bridge-regression"
-                  />
-                  {showXSpread
-                    ? points.map((point) => {
-                        const x = scale(point.x, xMin, xMax, plotLeft, plotRight);
-                        const predictedY = stats.intercept + stats.slope * point.x;
-                        return (
-                          <line
-                            key={`residual-${point.id}`}
-                            x1={x}
-                            y1={scale(point.y, yMin, yMax, plotBottom, plotTop)}
-                            x2={x}
-                            y2={scale(predictedY, yMin, yMax, plotBottom, plotTop)}
-                            className="scatter-bridge-residual"
-                          />
-                        );
-                      })
-                    : null}
-                </>
-              ) : null}
-
-              {showSlopeArrows && showRegressionLine && showXSpread
-                ? stepArrows.map((step) => (
-                    <g key={`step-${step.hour}`}>
-                      <line
-                        x1={step.sx}
-                        y1={step.sy}
-                        x2={step.ex - 6}
-                        y2={step.sy}
-                        className="scatter-bridge-step-arrow"
-                        markerEnd="url(#scatter-bridge-arrow-right)"
-                      />
-                      <line
-                        x1={step.ex}
-                        y1={step.sy}
-                        x2={step.ex}
-                        y2={step.ey}
-                        className="scatter-bridge-step-arrow"
-                        markerEnd="url(#scatter-bridge-arrow-up)"
-                      />
-                    </g>
-                  ))
-                : null}
-
-              {showSlopeArrows && showRegressionLine && showXSpread && highlightedStep ? (
-                <text
-                  x={highlightedStep.ex + 12}
-                  y={(highlightedStep.sy + highlightedStep.ey) / 2 + 6}
-                  className="scatter-bridge-step-label"
-                >
-                  {`${stats.slope.toFixed(2)}점`}
-                </text>
-              ) : null}
-
-              {showObservations
-                ? points.map((point) => {
-                    const x = showXSpread ? scale(point.x, xMin, xMax, plotLeft, plotRight) : point.yOnlyX;
-                    const y = scale(point.y, yMin, yMax, plotBottom, plotTop);
-
-                    return (
-                      <circle
-                        key={point.id}
-                        cx={x}
-                        cy={y}
-                        r="8.5"
-                        className="scatter-bridge-dot"
-                        style={{ transition: "cx 700ms ease, cy 700ms ease, opacity 220ms ease" }}
-                      />
-                    );
-                  })
-                : null}
-
-              {showPrediction && showXSpread ? (
-                <circle
-                  cx={predictionPointX}
-                  cy={predictionPointY}
-                  r="12"
-                  className="scatter-bridge-prediction-dot"
-                />
-              ) : null}
-
-              {showXSpread
-                ? Array.from({ length: Math.floor(xMax) + 1 }, (_, index) => (
-                    <text
-                      key={`x-tick-${index}`}
-                      x={scale(index, xMin, xMax, plotLeft, plotRight)}
-                      y={plotBottom + 34}
-                      textAnchor="middle"
-                      className="scatter-bridge-tick"
-                    >
-                      {index}
-                    </text>
-                  ))
-                : null}
-
-              {[70, 75, 80, 85, 90, 95, 100].map((value) => (
-                <text
-                  key={`y-tick-${value}`}
-                  x={plotLeft - 22}
-                  y={scale(value, yMin, yMax, plotBottom, plotTop) + 6}
-                  textAnchor="end"
-                  className="scatter-bridge-tick"
-                >
-                  {value}
-                </text>
-              ))}
-
-              {showXSpread ? (
-                <text x={(plotLeft + plotRight) / 2} y="712" textAnchor="middle" className="scatter-bridge-label">
-                  공부시간 (시간)
-                </text>
-              ) : null}
-              <text
-                x="48"
-                y={(plotTop + plotBottom) / 2}
-                textAnchor="middle"
-                className="scatter-bridge-label"
-                transform={`rotate(-90 48 ${(plotTop + plotBottom) / 2})`}
-              >
-                성적
-              </text>
-            </svg>
+            <ScatterBridgeFigure
+              points={points}
+              stats={stats}
+              showObservations={showObservations}
+              showXSpread={showXSpread}
+              showXMeanLine={showXMeanLine}
+              showYMeanLine={showYMeanLine}
+              showRegressionLine={showRegressionLine}
+              showPrediction={showPrediction}
+              showSlopeArrows={showSlopeArrows}
+              progressValue={progressValue}
+            />
           </div>
 
           <section className="regswitch-slider-card">
@@ -475,47 +631,79 @@ export default function BasicStatsScatterBridgePage() {
         </article>
 
         <aside className="regswitch-panel">
-          <section className="rr-step-slider regswitch-value-card scatter-bridge-panel">
-            <span>요약 정보</span>
-            <div className="regswitch-value-grid">
-              <div>
-                <small>성적 평균</small>
-                <strong>{stats.yMean.toFixed(2)}점</strong>
-              </div>
-              <div>
-                <small>성적 표준편차</small>
-                <strong>{stats.yStd.toFixed(2)}점</strong>
-              </div>
-              <div>
-                <small>공부시간 평균</small>
-                <strong>{stats.xMean.toFixed(2)}시간</strong>
-              </div>
-              <div>
-                <small>공부시간 표준편차</small>
-                <strong>{stats.xStd.toFixed(2)}시간</strong>
-              </div>
-            </div>
-          </section>
-
-          <section className="rr-step-slider regswitch-value-card scatter-bridge-panel">
-            <span>예측값 위치</span>
-            <div className="regswitch-value-grid">
-              <div>
-                <small>공부시간 X</small>
-                <strong>{predictionX.toFixed(2)}시간</strong>
-              </div>
-              <div>
-                <small>예측 성적</small>
-                <strong>{predictionY.toFixed(2)}점</strong>
-              </div>
-            </div>
-            <p>성적 = β₀ + β₁ × 공부시간</p>
-            <p className="regswitch-equation-value">
-              {`${predictionY.toFixed(2)} = ${stats.intercept.toFixed(2)} + ${stats.slope.toFixed(2)}×${predictionX.toFixed(2)}`}
-            </p>
-          </section>
+          <ScatterBridgeSummaryPanel stats={stats} />
+          <ScatterBridgePredictionPanel stats={stats} predictionX={predictionX} />
         </aside>
       </section>
+
+      <div
+        ref={mobileFit.frameRef}
+        className="scatter-bridge-mobile-fit-frame"
+        data-ready={mobileFit.ready ? "true" : "false"}
+        style={mobileFit.height ? { height: `${mobileFit.height}px` } : undefined}
+      >
+        <div
+          ref={mobileFit.contentRef}
+          className="scatter-bridge-mobile-fit-inner"
+          style={{ transform: `scale(${mobileFit.scale})` }}
+        >
+          <section className="scatter-bridge-mobile-stack">
+            {MOBILE_SCATTER_SECTIONS.map((section) => {
+              const sectionProgress =
+                section.id === "prediction" ? mobilePredictionProgress : section.toggles.progressValue;
+              const sectionPredictionX = (sectionProgress / 100) * xAtScore100;
+
+              return (
+                <article key={section.id} className="rr-graph-card scatter-bridge-mobile-section">
+                  <div className="rr-graph-head scatter-bridge-mobile-head">
+                    <div>
+                      <p className="panel-label">{section.groupTitle}</p>
+                      <h2>{section.sectionTitle}</h2>
+                    </div>
+                  </div>
+
+                  <div className="scatter-bridge-plot-wrap">
+                    <ScatterBridgeFigure
+                      points={points}
+                      stats={stats}
+                      showObservations={section.toggles.showObservations}
+                      showXSpread={section.toggles.showXSpread}
+                      showXMeanLine={section.toggles.showXMeanLine}
+                      showYMeanLine={section.toggles.showYMeanLine}
+                      showRegressionLine={section.toggles.showRegressionLine}
+                      showPrediction={section.toggles.showPrediction}
+                      showSlopeArrows={section.toggles.showSlopeArrows}
+                      progressValue={sectionProgress}
+                    />
+                  </div>
+
+                  {section.id === "prediction" ? (
+                    <section className="regswitch-slider-card scatter-bridge-mobile-slider">
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="1"
+                        value={mobilePredictionProgress}
+                        onChange={(event) => setMobilePredictionProgress(Number(event.target.value))}
+                        aria-label="예측값 이동"
+                      />
+                    </section>
+                  ) : null}
+
+                  {renderMobileScatterPanel(section.id, stats, sectionPredictionX)}
+                </article>
+              );
+            })}
+          </section>
+
+          <div className="scatter-bridge-mobile-footer">
+            <Link className="secondary-button" href="/lab">
+              메인으로
+            </Link>
+          </div>
+        </div>
+      </div>
     </main>
   );
 }

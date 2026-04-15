@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -53,6 +53,20 @@ function correlation(x, y) {
   const sy = sampleStd(y);
   if (sx === 0 || sy === 0) return 0;
   return covariance(x, y) / (sx * sy);
+}
+
+function calculateDatasetStats(dataset) {
+  const xMean = mean(dataset.x);
+  const yMean = mean(dataset.y);
+  const centeredProducts = dataset.x.map((xValue, index) => (xValue - xMean) * (dataset.y[index] - yMean));
+  const productSum = centeredProducts.reduce((sum, value) => sum + value, 0);
+  const sx = sampleStd(dataset.x);
+  const sy = sampleStd(dataset.y);
+  const cov = covariance(dataset.x, dataset.y);
+  const r = correlation(dataset.x, dataset.y);
+  const tValue = tFromCorrelation(r, dataset.x.length);
+  const standardError = Math.sqrt((1 - r ** 2) / Math.max(dataset.x.length - 2, 1));
+  return { productSum, sx, sy, cov, r, tValue, n: dataset.x.length, standardError };
 }
 
 function tFromCorrelation(r, n) {
@@ -463,19 +477,7 @@ export default function CovarianceCorrelationProductsPage() {
   const [showTLine, setShowTLine] = useState(false);
   const dataset = useMemo(() => DATASETS.find((item) => item.id === datasetId) ?? DATASETS[0], [datasetId]);
 
-  const stats = useMemo(() => {
-    const xMean = mean(dataset.x);
-    const yMean = mean(dataset.y);
-    const centeredProducts = dataset.x.map((xValue, index) => (xValue - xMean) * (dataset.y[index] - yMean));
-    const productSum = centeredProducts.reduce((sum, value) => sum + value, 0);
-    const sx = sampleStd(dataset.x);
-    const sy = sampleStd(dataset.y);
-    const cov = covariance(dataset.x, dataset.y);
-    const r = correlation(dataset.x, dataset.y);
-    const tValue = tFromCorrelation(r, dataset.x.length);
-    const standardError = Math.sqrt((1 - r ** 2) / Math.max(dataset.x.length - 2, 1));
-    return { productSum, sx, sy, cov, r, tValue, n: dataset.x.length, standardError };
-  }, [dataset]);
+  const stats = useMemo(() => calculateDatasetStats(dataset), [dataset]);
 
   const displayOrder = useMemo(() => {
     const xMean = mean(dataset.x);
@@ -498,6 +500,25 @@ export default function CovarianceCorrelationProductsPage() {
     setVisibleCount(0);
     setShowTLine(false);
   }, [datasetId]);
+
+  const mobileDatasets = useMemo(
+    () =>
+      DATASETS.map((item) => {
+        const xMean = mean(item.x);
+        const yMean = mean(item.y);
+        const centered = item.x.map((xValue, index) => ({
+          x: xValue - xMean,
+          y: item.y[index] - yMean,
+          product: (xValue - xMean) * (item.y[index] - yMean),
+        }));
+        return {
+          dataset: item,
+          stats: calculateDatasetStats(item),
+          displayOrder: buildDisplayOrder(centered),
+        };
+      }),
+    []
+  );
 
   return (
     <main className="rr-shell tf-shell corr-shell">
@@ -660,6 +681,86 @@ export default function CovarianceCorrelationProductsPage() {
           <strong>{formatNumber(stats.tValue)}</strong>
         </article>
       </section>
+
+      <section className="corr-mobile-stack">
+        {mobileDatasets.map(({ dataset: mobileDataset, stats: mobileStats, displayOrder: mobileDisplayOrder }) => (
+          <section key={mobileDataset.id} className="rr-graph-card corr-mobile-section">
+            <div className="rr-graph-head corr-mobile-head">
+              <div>
+                <p className="panel-label">Case</p>
+                <h2 className="regswitch-title">{mobileDataset.title}</h2>
+              </div>
+            </div>
+
+            <div className="corr-plot-wrap corr-mobile-plot">
+              <CoordinateInnerProductSvg
+                dataset={mobileDataset}
+                showDecorations
+                visibleCount={mobileDisplayOrder.length}
+                currentProductSum={mobileStats.productSum}
+              />
+            </div>
+
+            <section className="corr-metric-grid corr-mobile-metric-grid">
+              <article className="tf-metric-card">
+                <span>내적의 합</span>
+                <strong>{formatNumber(mobileStats.productSum)}</strong>
+              </article>
+              <article className="tf-metric-card">
+                <span>X 표준편차</span>
+                <strong>{formatNumber(mobileStats.sx)}</strong>
+              </article>
+              <article className="tf-metric-card">
+                <span>Y 표준편차</span>
+                <strong>{formatNumber(mobileStats.sy)}</strong>
+              </article>
+              <article className="tf-metric-card">
+                <span>공분산</span>
+                <strong>{formatNumber(mobileStats.cov)}</strong>
+              </article>
+              <article className="tf-metric-card">
+                <span>상관계수</span>
+                <strong>{formatNumber(mobileStats.r)}</strong>
+              </article>
+              <article className="tf-metric-card">
+                <span>t 값</span>
+                <strong>{formatNumber(mobileStats.tValue)}</strong>
+              </article>
+            </section>
+
+            <div className="corr-plot-wrap corr-mobile-plot">
+              <TDistributionSvg tValue={mobileStats.tValue} df={mobileStats.n - 2} showObserved />
+            </div>
+          </section>
+        ))}
+
+        <section className="corr-formula-card corr-mobile-formula-card" aria-label="공식 정보">
+          <div className="corr-formula-rich">
+            <div className="corr-formula-block">
+              <span>공분산</span>
+              <strong>공분산 = Σ(xy) / (n - 1)</strong>
+              <em>{`${formatNumber(stats.cov)} = ${formatNumber(stats.productSum)} / ${stats.n - 1}`}</em>
+            </div>
+            <div className="corr-formula-block">
+              <span>상관계수</span>
+              <strong>상관계수 = 공분산 / (표준편차X × 표준편차Y)</strong>
+              <em>{`${formatNumber(stats.r)} = ${formatNumber(stats.cov)} / (${formatNumber(stats.sx)} × ${formatNumber(stats.sy)})`}</em>
+            </div>
+            <div className="corr-formula-block">
+              <span>t 값</span>
+              <strong>t = (r - ρ) / (√(1 - r²) / √(n - 2))</strong>
+              <em>{`${formatNumber(stats.tValue)} = (${formatNumber(stats.r)} - 0) / (${formatNumber(Math.sqrt(1 - stats.r ** 2))} / ${formatNumber(Math.sqrt(stats.n - 2))})`}</em>
+            </div>
+          </div>
+        </section>
+
+        <div className="corr-mobile-footer">
+          <Link className="secondary-button regswitch-home-button" href="/lab">
+            메인으로
+          </Link>
+        </div>
+      </section>
     </main>
   );
 }
+

@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { downloadCsv } from "../_shared/csv";
+import { useMobileFitScale } from "../_shared/useMobileFitScale";
 import {
   createSeededRandom,
   formatNumber,
@@ -34,6 +35,44 @@ const MULTIPLE_VIEW_OPTIONS = [
 const COLLINEARITY_VIEW_OPTIONS = [
   { key: "correlation", label: "상관관계분석" },
   { key: "regression", label: "회귀분석" },
+];
+
+const MOBILE_SECTIONS = [
+  {
+    id: "multiple-overview",
+    mode: "multiple",
+    view: "overview",
+    groupTitle: "다중회귀분석",
+    sectionTitle: "회귀평면",
+  },
+  {
+    id: "multiple-x2",
+    mode: "multiple",
+    view: "x2Control",
+    groupTitle: "다중회귀분석",
+    sectionTitle: "x2 통제",
+  },
+  {
+    id: "multiple-x1",
+    mode: "multiple",
+    view: "x1Control",
+    groupTitle: "다중회귀분석",
+    sectionTitle: "x1 통제",
+  },
+  {
+    id: "collinearity-correlation",
+    mode: "collinearity",
+    view: "correlation",
+    groupTitle: "공선성",
+    sectionTitle: "상관관계분석",
+  },
+  {
+    id: "collinearity-regression",
+    mode: "collinearity",
+    view: "regression",
+    groupTitle: "공선성",
+    sectionTitle: "회귀분석",
+  },
 ];
 
 const CAMERA_PRESETS = {
@@ -546,8 +585,94 @@ function buildCollinearityPlot(scene, viewKey) {
   };
 }
 
+function ResultsBlock({ title, children, summary = false }) {
+  return (
+    <div className={`mediation-results-block${summary ? " mediation-results-block-summary" : ""}`}>
+      <p className="mediation-results-label">{title}</p>
+      {children}
+    </div>
+  );
+}
+
+function ModelTable({ labels, values, twoColumn = false }) {
+  return (
+    <table
+      className={`multireg2-table multireg2-model-table modlab-model-table${twoColumn ? " is-two-column" : ""}`}
+    >
+      <thead>
+        <tr>
+          {labels.map((label) => (
+            <th key={label}>{label}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          {values.map((value, index) => (
+            <td key={`${labels[index]}-${value}`}>{value}</td>
+          ))}
+        </tr>
+      </tbody>
+    </table>
+  );
+}
+
+function CoefTable({ rows }) {
+  return (
+    <table className="multireg2-table multireg2-coef-table">
+      <thead>
+        <tr>
+          <th>구분</th>
+          <th>회귀계수</th>
+          <th>표준오차</th>
+          <th>t</th>
+          <th>p</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => (
+          <tr key={row.name}>
+            <td>{row.name}</td>
+            <td>{row.coef}</td>
+            <td>{row.stderr}</td>
+            <td>{row.t}</td>
+            <td>{row.p}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function CorrelationMatrixTable() {
+  return (
+    <>
+      <table className="multireg2-table multireg2-coef-table mediation-summary-table">
+        <thead>
+          <tr>
+            <th>변수</th>
+            <th>x1</th>
+            <th>x2</th>
+          </tr>
+        </thead>
+        <tbody>
+          {COLLINEARITY_CORRELATION_RESULTS.matrix.map((row) => (
+            <tr key={row.name}>
+              <td>{row.name}</td>
+              <td>{row.x1}</td>
+              <td>{row.x2}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="multireg2-note">*** p&lt;0.001, ** p&lt;0.01, * p&lt;0.05</p>
+    </>
+  );
+}
+
 export default function MultipleRegressionCollinearityPage() {
   const scenes = useMemo(() => buildTeachingScenes(), []);
+  const mobileFit = useMobileFitScale(820, 560);
   const [mode, setMode] = useState("multiple");
   const [multipleView, setMultipleView] = useState("overview");
   const [collinearityView, setCollinearityView] = useState("correlation");
@@ -565,6 +690,48 @@ export default function MultipleRegressionCollinearityPage() {
       : COLLINEARITY_REGRESSION_RESULTS.model;
   const activeCollinearityModelLabels = activeCollinearityModelRows.map((item) => item.label);
   const activeCollinearityModelValues = activeCollinearityModelRows.map((item) => item.value);
+  const renderMultipleResults = () => (
+    <section className="rr-step-slider multireg2-value-card multireg2-results-card">
+      <ResultsBlock title="모형">
+        <ModelTable labels={multipleModelLabels} values={multipleModelValues} />
+      </ResultsBlock>
+
+      <ResultsBlock title="회귀계수">
+        <CoefTable rows={MULTIPLE_REGRESSION_RESULTS.coefficients} />
+      </ResultsBlock>
+    </section>
+  );
+  const renderCollinearityResults = (view) => {
+    const modelRows =
+      view === "correlation" ? COLLINEARITY_CORRELATION_RESULTS.model : COLLINEARITY_REGRESSION_RESULTS.model;
+    const modelLabels = modelRows.map((item) => item.label);
+    const modelValues = modelRows.map((item) => item.value);
+
+    return (
+      <section className="rr-step-slider multireg2-value-card multireg2-results-card">
+        <ResultsBlock title="모형">
+          <ModelTable labels={modelLabels} values={modelValues} twoColumn={modelRows.length === 2} />
+        </ResultsBlock>
+
+        {view === "correlation" ? (
+          <ResultsBlock title="상관행렬" summary>
+            <CorrelationMatrixTable />
+          </ResultsBlock>
+        ) : (
+          <ResultsBlock title="회귀계수">
+            <CoefTable rows={COLLINEARITY_REGRESSION_RESULTS.coefficients} />
+          </ResultsBlock>
+        )}
+      </section>
+    );
+  };
+  const mobileSections = MOBILE_SECTIONS.map((section) => ({
+    ...section,
+    plot:
+      section.mode === "multiple"
+        ? buildMultiplePlot(scenes.multiple, section.view)
+        : buildCollinearityPlot(scenes.collinearity, section.view),
+  }));
 
   return (
     <main className="rr-shell multireg2-shell">
@@ -631,6 +798,8 @@ export default function MultipleRegressionCollinearityPage() {
               }}
               config={{
                 responsive: true,
+                showTips: true,
+                doubleClick: "reset+autosize",
                 displaylogo: false,
                 modeBarButtonsToRemove: ["lasso2d", "select2d", "lasso3d"],
               }}
@@ -797,6 +966,67 @@ export default function MultipleRegressionCollinearityPage() {
           )}
         </aside>
       </section>
+
+      <div
+        ref={mobileFit.frameRef}
+        className="multireg2-mobile-fit-frame"
+        data-ready={mobileFit.ready ? "true" : "false"}
+        style={mobileFit.height ? { height: `${mobileFit.height}px` } : undefined}
+      >
+        <div
+          ref={mobileFit.contentRef}
+          className="multireg2-mobile-fit-inner"
+          style={{ transform: `scale(${mobileFit.scale})` }}
+        >
+          <section className="multireg2-mobile-stack">
+            {mobileSections.map((section) => (
+              <article key={section.id} className="rr-graph-card multireg2-mobile-section">
+                <div className="rr-graph-head multireg2-stage-head multireg2-mobile-head">
+                  <div>
+                    <p className="panel-label">{section.groupTitle}</p>
+                    <h2>{section.sectionTitle}</h2>
+                  </div>
+                </div>
+
+                <div className="multireg2-plot-wrap multireg2-mobile-plot">
+                  <Plot
+                    data={section.plot.data}
+                    layout={{
+                      font: {
+                        family: "Pretendard, Noto Sans KR, sans-serif",
+                        color: "#112d4e",
+                        size: 14,
+                      },
+                      ...section.plot.layout,
+                      margin: { l: 0, r: 0, t: 48, b: 28 },
+                    }}
+                    config={{
+                      responsive: true,
+                      showTips: true,
+                      doubleClick: "reset+autosize",
+                      displaylogo: false,
+                      displayModeBar: false,
+                    }}
+                    style={{ width: "100%", height: "100%" }}
+                  />
+                </div>
+
+                <div className="multireg2-mobile-cards">
+                  {section.mode === "multiple"
+                    ? renderMultipleResults()
+                    : renderCollinearityResults(section.view)}
+                </div>
+              </article>
+            ))}
+          </section>
+
+          <div className="multireg2-mobile-footer">
+            <Link className="secondary-button" href="/lab">
+              메인으로
+            </Link>
+          </div>
+        </div>
+      </div>
     </main>
   );
 }

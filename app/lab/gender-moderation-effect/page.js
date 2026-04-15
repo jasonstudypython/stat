@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { downloadCsv } from "../_shared/csv";
+import { useMobileFitScale } from "../_shared/useMobileFitScale";
 import {
   createSeededRandom,
   formatNumber,
@@ -38,6 +39,35 @@ const EFFECT_OPTIONS = [
 const PLOT_STYLE_OPTIONS = [
   { key: "interaction", label: "interaction plot" },
   { key: "simpleSlopes", label: "simple slopes plot" },
+];
+
+const MOBILE_EFFECT_SECTIONS = [
+  { key: "full", plotStyle: "interaction", groupTitle: "조절효과 분석", sectionTitle: "조절효과 모형" },
+  { key: "xMain", plotStyle: "interaction", groupTitle: "조절효과 분석", sectionTitle: "성별이 남성(=0)일 경우" },
+  {
+    key: "zMain",
+    plotStyle: "interaction",
+    groupTitle: "조절효과 분석",
+    sectionTitle: "성별이 여성(=1)일 경우 조절변수의 주효과",
+  },
+  {
+    key: "interaction",
+    plotStyle: "interaction",
+    groupTitle: "조절효과 분석",
+    sectionTitle: "성별이 여성(=1)일 경우 상호작용항의 조절효과",
+  },
+  {
+    key: "moderationModel",
+    plotStyle: "interaction",
+    groupTitle: "조절효과 시각화",
+    sectionTitle: "interaction plot",
+  },
+  {
+    key: "moderationModel",
+    plotStyle: "simpleSlopes",
+    groupTitle: "조절효과 시각화",
+    sectionTitle: "simple slopes plot",
+  },
 ];
 
 const COLOR_BY_GROUP = {
@@ -656,6 +686,7 @@ function buildExpressionItems(expression) {
 
 export default function GenderModerationEffectPage() {
   const scene = useMemo(() => buildModerationScene(), []);
+  const mobileFit = useMobileFitScale(820, 560);
   const formulaCards = useMemo(() => buildFormulaCards(scene), [scene]);
   const stageCards = useMemo(() => buildStageCards(), []);
   const fullModelExpressions = useMemo(
@@ -679,8 +710,6 @@ export default function GenderModerationEffectPage() {
   const [plotStyle, setPlotStyle] = useState("interaction");
 
   const plot = buildPlot(scene, groupFilter, effectView, plotStyle);
-  const isOverviewCardView =
-    effectView === "full" || effectView === "xMain" || effectView === "zMain" || effectView === "interaction";
 
   const coefficientRows = [
     { name: "const", coef: formatNumber(scene.coefficients[0], 3), stderr: formatNumber(scene.standardErrors[0], 3), t: formatNumber(scene.tValues[0], 3), p: formatPValue(scene.pValues[0]) },
@@ -688,6 +717,405 @@ export default function GenderModerationEffectPage() {
     { name: "성별", coef: formatNumber(scene.coefficients[2], 3), stderr: formatNumber(scene.standardErrors[2], 3), t: formatNumber(scene.tValues[2], 3), p: formatPValue(scene.pValues[2]) },
     { name: "상호작용항", coef: formatNumber(scene.coefficients[3], 3), stderr: formatNumber(scene.standardErrors[3], 3), t: formatNumber(scene.tValues[3], 3), p: formatPValue(scene.pValues[3]) },
   ];
+
+  const renderExpressionSequence = (expressionItems, currentView) => (
+    <div className="modlab-expression-strip" aria-label="단계 수식">
+      {expressionItems.map((item) => {
+        const isCancelledZero =
+          currentView === "xMain" &&
+          item.type === "card" &&
+          (item.value === "16.921×0" || item.value === "2.643×(공부시간×0)");
+        const isEmphasisCard =
+          item.type === "card" &&
+          (
+            item.value === "성적" ||
+            item.value === "27.558" ||
+            item.value === "2.335×공부시간" ||
+            (currentView === "zMain" && item.value === "16.921×1") ||
+            (currentView === "interaction" &&
+              (item.value === "16.921" || item.value === "2.643×공부시간"))
+          );
+
+        return item.type === "operator" ? (
+          <span key={item.key} className="modlab-expression-operator">
+            {item.value}
+          </span>
+        ) : (
+          <article
+            key={item.key}
+            className={`modlab-expression-card${isEmphasisCard ? " is-emphasis" : ""}${isCancelledZero ? " is-cancelled-zero" : ""}`}
+          >
+            {currentView === "zMain" && item.value === "16.921×1" ? (
+              <span className="modlab-expression-note">성별(여성=1)의 효과</span>
+            ) : null}
+            {currentView === "interaction" && item.value === "2.643×공부시간" ? (
+              <span className="modlab-expression-note">상호작용항의 조절효과</span>
+            ) : null}
+            <p>{item.value}</p>
+            {isCancelledZero ? (
+              <>
+                <span className="modlab-cancel-slash" aria-hidden="true" />
+                <span className="modlab-cancel-zero" aria-hidden="true">
+                  0
+                </span>
+              </>
+            ) : null}
+          </article>
+        );
+      })}
+    </div>
+  );
+
+  const renderFormulaArea = (currentView) => {
+    if (currentView === "moderationModel") {
+      return null;
+    }
+
+    const isOverviewView =
+      currentView === "full" || currentView === "xMain" || currentView === "zMain" || currentView === "interaction";
+
+    return (
+      <div className="mediation-results-block mediation-results-block-summary">
+        {isOverviewView ? (
+          <div className="modlab-expression-stack">
+            <div className="modlab-expression-strip" aria-label="전체모형 일반식">
+              {fullModelExpressions[0].map((item) =>
+                item.type === "operator" ? (
+                  <span key={item.key} className="modlab-expression-operator">
+                    {item.value}
+                  </span>
+                ) : (
+                  <article key={item.key} className="modlab-expression-card">
+                    <p>{item.value}</p>
+                  </article>
+                ),
+              )}
+            </div>
+
+            <div className="mediation-results-block modlab-inline-results-block">
+              <p className="mediation-results-label">회귀계수</p>
+              <table className="multireg2-table multireg2-coef-table">
+                <thead>
+                  <tr>
+                    <th>구분</th>
+                    <th>회귀계수</th>
+                    <th>표준오차</th>
+                    <th>t</th>
+                    <th>p</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {coefficientRows.map((row) => (
+                    <tr key={row.name}>
+                      <td>{row.name}</td>
+                      <td>{row.coef}</td>
+                      <td>{row.stderr}</td>
+                      <td>{row.t}</td>
+                      <td>{row.p}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="modlab-expression-strip" aria-label="전체모형 개념식">
+              {fullModelExpressions[1].map((item) =>
+                item.type === "operator" ? (
+                  <span key={item.key} className="modlab-expression-operator">
+                    {item.value}
+                  </span>
+                ) : (
+                  <article key={item.key} className="modlab-expression-card">
+                    <p>{item.value}</p>
+                  </article>
+                ),
+              )}
+            </div>
+
+            {(currentView === "xMain"
+              ? xMainExpressions
+              : currentView === "zMain"
+                ? zMainExpressions
+                : interactionExpressions
+            ).map((expression, expressionIndex) => (
+              <div key={`${currentView}-expression-${expressionIndex}`} className="modlab-expression-stack">
+                <p className="mediation-results-label">
+                  {
+                    (
+                      currentView === "xMain"
+                        ? stageCards.xMain.expressions
+                        : currentView === "zMain"
+                          ? stageCards.zMain.expressions
+                          : stageCards.interaction.expressions
+                    )[expressionIndex].title
+                  }
+                </p>
+                {renderExpressionSequence(expression, currentView)}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <>
+            <p className="mediation-results-label">공식 분해</p>
+            <div className="modlab-formula-matrix">
+              {formulaCards.map((card) => (
+                <section key={card.key} className="modlab-formula-row-group">
+                  <div className="modlab-formula-mini-card is-title">
+                    <span className="modlab-formula-mini-label">구분</span>
+                    <strong>{card.title}</strong>
+                  </div>
+                  <div className="modlab-formula-mini-card">
+                    <span className="modlab-formula-mini-label">종속변수</span>
+                    <code>{card.dependent}</code>
+                  </div>
+                  <div className="modlab-formula-mini-card">
+                    <span className="modlab-formula-mini-label">절편</span>
+                    <code>{card.intercept}</code>
+                  </div>
+                  <div className="modlab-formula-mini-card">
+                    <span className="modlab-formula-mini-label">독립변수</span>
+                    <code>{card.independent}</code>
+                  </div>
+                  <div className="modlab-formula-mini-card">
+                    <span className="modlab-formula-mini-label">조절변수</span>
+                    <code>{card.moderator}</code>
+                  </div>
+                  <div className="modlab-formula-mini-card">
+                    <span className="modlab-formula-mini-label">상호작용항</span>
+                    <code>{card.interaction}</code>
+                  </div>
+                  {card.reduced ? (
+                    <div className="modlab-formula-mini-card is-wide">
+                      <span className="modlab-formula-mini-label">정리된 식</span>
+                      <code>{card.reduced}</code>
+                    </div>
+                  ) : null}
+                </section>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
+
+  const renderResultsPanel = (currentView) => {
+    const showTables = currentView === "moderationModel";
+
+    return (
+      <section className="rr-step-slider multireg2-value-card multireg2-results-card">
+        {showTables ? (
+          <>
+            <div className="mediation-results-block">
+              <p className="mediation-results-label">모형</p>
+              <table className="multireg2-table multireg2-model-table modlab-model-table">
+                <thead>
+                  <tr>
+                    <th>R제곱</th>
+                    <th>수정된 R제곱</th>
+                    <th>F</th>
+                    <th>p</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>{formatNumber(scene.r2)}</td>
+                    <td>{formatNumber(scene.adjustedR2)}</td>
+                    <td>{formatNumber(scene.fValue, 1)}</td>
+                    <td>0.000</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div className="mediation-results-block">
+              <p className="mediation-results-label">회귀계수</p>
+              <table className="multireg2-table multireg2-coef-table">
+                <thead>
+                  <tr>
+                    <th>구분</th>
+                    <th>회귀계수</th>
+                    <th>표준오차</th>
+                    <th>t</th>
+                    <th>p</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {coefficientRows.map((row) => (
+                    <tr key={row.name}>
+                      <td>{row.name}</td>
+                      <td>{row.coef}</td>
+                      <td>{row.stderr}</td>
+                      <td>{row.t}</td>
+                      <td>{row.p}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : null}
+
+        {renderFormulaArea(currentView)}
+      </section>
+    );
+  };
+
+  const renderMobileResultsPanel = (currentView) => {
+    if (currentView === "full") {
+      return (
+        <section className="rr-step-slider multireg2-value-card multireg2-results-card">
+          <div className="mediation-results-block mediation-results-block-summary">
+            <div className="modlab-expression-stack">
+              <div className="modlab-expression-strip" aria-label="전체모형 일반식">
+                {fullModelExpressions[0].map((item) =>
+                  item.type === "operator" ? (
+                    <span key={item.key} className="modlab-expression-operator">
+                      {item.value}
+                    </span>
+                  ) : (
+                    <article key={item.key} className="modlab-expression-card">
+                      <p>{item.value}</p>
+                    </article>
+                  ),
+                )}
+              </div>
+
+              <div className="mediation-results-block modlab-inline-results-block">
+                <p className="mediation-results-label">회귀계수</p>
+                <table className="multireg2-table multireg2-coef-table">
+                  <thead>
+                    <tr>
+                      <th>구분</th>
+                      <th>회귀계수</th>
+                      <th>표준오차</th>
+                      <th>t</th>
+                      <th>p</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {coefficientRows.map((row) => (
+                      <tr key={row.name}>
+                        <td>{row.name}</td>
+                        <td>{row.coef}</td>
+                        <td>{row.stderr}</td>
+                        <td>{row.t}</td>
+                        <td>{row.p}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="modlab-expression-strip" aria-label="전체모형 개념식">
+                {fullModelExpressions[1].map((item) =>
+                  item.type === "operator" ? (
+                    <span key={item.key} className="modlab-expression-operator">
+                      {item.value}
+                    </span>
+                  ) : (
+                    <article key={item.key} className="modlab-expression-card">
+                      <p>{item.value}</p>
+                    </article>
+                  ),
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+      );
+    }
+
+    if (currentView === "moderationModel") {
+      return (
+        <section className="rr-step-slider multireg2-value-card multireg2-results-card">
+          <div className="mediation-results-block">
+            <p className="mediation-results-label">모형</p>
+            <table className="multireg2-table multireg2-model-table modlab-model-table">
+              <thead>
+                <tr>
+                  <th>R제곱</th>
+                  <th>수정된 R제곱</th>
+                  <th>F</th>
+                  <th>p</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>{formatNumber(scene.r2)}</td>
+                  <td>{formatNumber(scene.adjustedR2)}</td>
+                  <td>{formatNumber(scene.fValue, 1)}</td>
+                  <td>0.000</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mediation-results-block">
+            <p className="mediation-results-label">회귀계수</p>
+            <table className="multireg2-table multireg2-coef-table">
+              <thead>
+                <tr>
+                  <th>구분</th>
+                  <th>회귀계수</th>
+                  <th>표준오차</th>
+                  <th>t</th>
+                  <th>p</th>
+                </tr>
+              </thead>
+              <tbody>
+                {coefficientRows.map((row) => (
+                  <tr key={row.name}>
+                    <td>{row.name}</td>
+                    <td>{row.coef}</td>
+                    <td>{row.stderr}</td>
+                    <td>{row.t}</td>
+                    <td>{row.p}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      );
+    }
+
+    const expressionSets =
+      currentView === "xMain"
+        ? xMainExpressions
+        : currentView === "zMain"
+          ? zMainExpressions
+          : interactionExpressions;
+    const expressionMeta =
+      currentView === "xMain"
+        ? stageCards.xMain.expressions
+        : currentView === "zMain"
+          ? stageCards.zMain.expressions
+          : stageCards.interaction.expressions;
+
+    return (
+      <section className="rr-step-slider multireg2-value-card multireg2-results-card">
+        <div className="mediation-results-block mediation-results-block-summary">
+          <div className="modlab-expression-stack">
+            {expressionSets.map((expression, expressionIndex) => (
+              <div key={`${currentView}-mobile-expression-${expressionIndex}`} className="modlab-expression-stack">
+                <p className="mediation-results-label">{expressionMeta[expressionIndex].title}</p>
+                {renderExpressionSequence(expression, currentView)}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    );
+  };
+
+  const mobileSections = MOBILE_EFFECT_SECTIONS.map((section, index) => ({
+    id: `${section.key}-${section.plotStyle}-${index}`,
+    groupTitle: section.groupTitle,
+    sectionTitle: section.sectionTitle,
+    effectView: section.key,
+    plot: buildPlot(scene, "all", section.key, section.plotStyle),
+  }));
 
   return (
     <main className="rr-shell multireg2-shell modlab-shell">
@@ -744,6 +1172,8 @@ export default function GenderModerationEffectPage() {
               }}
               config={{
                 responsive: true,
+                showTips: true,
+                doubleClick: "reset+autosize",
                 displaylogo: false,
                 modeBarButtonsToRemove: ["lasso2d", "select2d"],
               }}
@@ -790,232 +1220,66 @@ export default function GenderModerationEffectPage() {
             </section>
           ) : null}
 
-          <section className="rr-step-slider multireg2-value-card multireg2-results-card">
-            {!isOverviewCardView ? (
-              <>
-                <div className="mediation-results-block">
-                  <p className="mediation-results-label">모형</p>
-                  <table className="multireg2-table multireg2-model-table modlab-model-table">
-                    <thead>
-                      <tr>
-                        <th>R제곱</th>
-                        <th>수정된 R제곱</th>
-                        <th>F</th>
-                        <th>p</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td>{formatNumber(scene.r2)}</td>
-                        <td>{formatNumber(scene.adjustedR2)}</td>
-                        <td>{formatNumber(scene.fValue, 1)}</td>
-                        <td>0.000</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="mediation-results-block">
-                  <p className="mediation-results-label">회귀계수</p>
-                  <table className="multireg2-table multireg2-coef-table">
-                    <thead>
-                      <tr>
-                        <th>구분</th>
-                        <th>회귀계수</th>
-                        <th>표준오차</th>
-                        <th>t</th>
-                        <th>p</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {coefficientRows.map((row) => (
-                        <tr key={row.name}>
-                          <td>{row.name}</td>
-                          <td>{row.coef}</td>
-                          <td>{row.stderr}</td>
-                          <td>{row.t}</td>
-                          <td>{row.p}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </>
-            ) : null}
-
-            {effectView !== "moderationModel" ? (
-              <div className="mediation-results-block mediation-results-block-summary">
-                {isOverviewCardView ? (
-                <div className="modlab-expression-stack">
-                  <div className="modlab-expression-strip" aria-label="전체모형 일반식">
-                    {fullModelExpressions[0].map((item) =>
-                      item.type === "operator" ? (
-                        <span key={item.key} className="modlab-expression-operator">
-                          {item.value}
-                        </span>
-                      ) : (
-                        <article key={item.key} className="modlab-expression-card">
-                          <p>{item.value}</p>
-                        </article>
-                      ),
-                    )}
-                  </div>
-
-                  <div className="mediation-results-block modlab-inline-results-block">
-                    <p className="mediation-results-label">회귀계수</p>
-                    <table className="multireg2-table multireg2-coef-table">
-                      <thead>
-                        <tr>
-                          <th>구분</th>
-                          <th>회귀계수</th>
-                          <th>표준오차</th>
-                          <th>t</th>
-                          <th>p</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {coefficientRows.map((row) => (
-                          <tr key={row.name}>
-                            <td>{row.name}</td>
-                            <td>{row.coef}</td>
-                            <td>{row.stderr}</td>
-                            <td>{row.t}</td>
-                            <td>{row.p}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <div className="modlab-expression-strip" aria-label="전체모형 개념식">
-                    {fullModelExpressions[1].map((item) =>
-                      item.type === "operator" ? (
-                        <span key={item.key} className="modlab-expression-operator">
-                          {item.value}
-                        </span>
-                      ) : (
-                        <article key={item.key} className="modlab-expression-card">
-                          <p>{item.value}</p>
-                        </article>
-                      ),
-                    )}
-                  </div>
-
-                  {effectView === "xMain" || effectView === "zMain" || effectView === "interaction"
-                    ? (
-                        effectView === "xMain"
-                          ? xMainExpressions
-                          : effectView === "zMain"
-                            ? zMainExpressions
-                            : interactionExpressions
-                      ).map((expression, expressionIndex) => (
-                        <div key={`${effectView}-expression-${expressionIndex}`} className="modlab-expression-stack">
-                          <p className="mediation-results-label">
-                            {
-                              (
-                                effectView === "xMain"
-                                  ? stageCards.xMain.expressions
-                                  : effectView === "zMain"
-                                    ? stageCards.zMain.expressions
-                                    : stageCards.interaction.expressions
-                              )[expressionIndex].title
-                            }
-                          </p>
-                          <div className="modlab-expression-strip" aria-label="독립변수의 효과 남성 대입식">
-                            {expression.map((item) => {
-                              const isCancelledZero =
-                                effectView === "xMain" &&
-                                item.type === "card" &&
-                                (item.value === "16.921×0" || item.value === "2.643×(공부시간×0)");
-                              const isEmphasisCard =
-                                item.type === "card" &&
-                                (
-                                  item.value === "성적" ||
-                                  item.value === "27.558" ||
-                                  item.value === "2.335×공부시간" ||
-                                  (effectView === "zMain" && item.value === "16.921×1") ||
-                                  (effectView === "interaction" &&
-                                    (item.value === "16.921" || item.value === "2.643×공부시간"))
-                                );
-
-                              return item.type === "operator" ? (
-                                <span key={item.key} className="modlab-expression-operator">
-                                  {item.value}
-                                </span>
-                              ) : (
-                                <article
-                                  key={item.key}
-                                  className={`modlab-expression-card${isEmphasisCard ? " is-emphasis" : ""}${isCancelledZero ? " is-cancelled-zero" : ""}`}
-                                >
-                                  {effectView === "zMain" && item.value === "16.921×1" ? (
-                                    <span className="modlab-expression-note">성별(여성=1)의 효과</span>
-                                  ) : null}
-                                  {effectView === "interaction" && item.value === "2.643×공부시간" ? (
-                                    <span className="modlab-expression-note">상호작용항의 조절효과</span>
-                                  ) : null}
-                                  <p>{item.value}</p>
-                                  {isCancelledZero ? (
-                                    <>
-                                      <span className="modlab-cancel-slash" aria-hidden="true" />
-                                      <span className="modlab-cancel-zero" aria-hidden="true">
-                                        0
-                                      </span>
-                                    </>
-                                  ) : null}
-                                </article>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ))
-                    : null}
-                </div>
-                ) : (
-                <>
-                  <p className="mediation-results-label">공식 분해</p>
-                  <div className="modlab-formula-matrix">
-                  {formulaCards.map((card) => (
-                    <section key={card.key} className="modlab-formula-row-group">
-                      <div className="modlab-formula-mini-card is-title">
-                        <span className="modlab-formula-mini-label">구분</span>
-                        <strong>{card.title}</strong>
-                      </div>
-                      <div className="modlab-formula-mini-card">
-                        <span className="modlab-formula-mini-label">종속변수</span>
-                        <code>{card.dependent}</code>
-                      </div>
-                      <div className="modlab-formula-mini-card">
-                        <span className="modlab-formula-mini-label">절편</span>
-                        <code>{card.intercept}</code>
-                      </div>
-                      <div className="modlab-formula-mini-card">
-                        <span className="modlab-formula-mini-label">독립변수</span>
-                        <code>{card.independent}</code>
-                      </div>
-                      <div className="modlab-formula-mini-card">
-                        <span className="modlab-formula-mini-label">조절변수</span>
-                        <code>{card.moderator}</code>
-                      </div>
-                      <div className="modlab-formula-mini-card">
-                        <span className="modlab-formula-mini-label">상호작용항</span>
-                        <code>{card.interaction}</code>
-                      </div>
-                      {card.reduced ? (
-                        <div className="modlab-formula-mini-card is-wide">
-                          <span className="modlab-formula-mini-label">정리된 식</span>
-                          <code>{card.reduced}</code>
-                        </div>
-                      ) : null}
-                    </section>
-                  ))}
-                  </div>
-                </>
-                )}
-              </div>
-            ) : null}
-          </section>
+          {renderResultsPanel(effectView)}
         </aside>
       </section>
+
+      <div
+        ref={mobileFit.frameRef}
+        className="modlab-mobile-fit-frame"
+        data-ready={mobileFit.ready ? "true" : "false"}
+        style={mobileFit.height ? { height: `${mobileFit.height}px` } : undefined}
+      >
+        <div
+          ref={mobileFit.contentRef}
+          className="modlab-mobile-fit-inner"
+          style={{ transform: `scale(${mobileFit.scale})` }}
+        >
+          <section className="modlab-mobile-stack">
+            {mobileSections.map((section) => (
+              <article key={section.id} className="rr-graph-card modlab-mobile-section">
+                <div className="rr-graph-head multireg2-stage-head modlab-mobile-head">
+                  <div>
+                    <p className="panel-label">{section.groupTitle}</p>
+                    <h2>{section.sectionTitle}</h2>
+                  </div>
+                </div>
+
+                <div className="multireg2-plot-wrap mediation-plot-wrap modlab-mobile-plot">
+                  <Plot
+                    data={section.plot.data}
+                    layout={{
+                      font: {
+                        family: "Pretendard, Noto Sans KR, sans-serif",
+                        color: "#112d4e",
+                        size: 14,
+                      },
+                      ...section.plot.layout,
+                      margin: { l: 36, r: 14, t: 48, b: 36 },
+                    }}
+                    config={{
+                      responsive: true,
+                      showTips: true,
+                      doubleClick: "reset+autosize",
+                      displaylogo: false,
+                      displayModeBar: false,
+                    }}
+                    style={{ width: "100%", height: "100%" }}
+                  />
+                </div>
+
+                <div className="modlab-mobile-cards">{renderMobileResultsPanel(section.effectView)}</div>
+              </article>
+            ))}
+          </section>
+
+          <div className="modlab-mobile-footer">
+            <Link className="secondary-button" href="/lab">
+              메인으로
+            </Link>
+          </div>
+        </div>
+      </div>
     </main>
   );
 }

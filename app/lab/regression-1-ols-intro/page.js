@@ -1,8 +1,9 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { downloadCsv } from "../_shared/csv";
+import { useMobileFitScale } from "../_shared/useMobileFitScale";
 
 const REG1_OLS_POINTS = [
   { x: 3.496714153, y: 3.4475037704 },
@@ -188,7 +189,8 @@ function OlsErrorCurve({ width, height, values, currentSlope, showCurrentPoint =
   const minX = Math.min(...values.map((item) => item.slope));
   const maxX = Math.max(...values.map((item) => item.slope));
   const minY = 0;
-  const maxY = 14;
+  const rawMaxY = Math.max(...values.map((item) => item.sse));
+  const maxY = Math.max(14, Math.ceil(rawMaxY / 5) * 5);
   const ySpan = maxY - minY;
   const xToPx = (value) => paddingLeft + ((value - minX) / (maxX - minX)) * plotWidth;
   const yToPx = (value) => paddingTop + plotHeight - ((value - minY) / ySpan) * plotHeight;
@@ -207,7 +209,7 @@ function OlsErrorCurve({ width, height, values, currentSlope, showCurrentPoint =
     minX + (maxX - minX) * 0.75,
     maxX,
   ];
-  const yTicks = [0, 7, 14];
+  const yTicks = [0, maxY / 2, maxY];
 
   return (
     <svg className="reg1intro-mini-plot" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="오차제곱합 그래프">
@@ -338,13 +340,14 @@ function RegressionScatterSvg({
   rejectionX,
   rejectionStep,
   showAllRejectionCurves,
+  compact = false,
 }) {
-  const width = 900;
-  const height = 760;
-  const paddingLeft = 92;
-  const paddingRight = 42;
-  const paddingTop = 42;
-  const paddingBottom = 84;
+  const width = compact ? 900 : 900;
+  const height = compact ? 600 : 760;
+  const paddingLeft = compact ? 82 : 92;
+  const paddingRight = compact ? 28 : 42;
+  const paddingTop = compact ? 24 : 42;
+  const paddingBottom = compact ? 60 : 84;
   const xMin = 0;
   const xMax = 5;
   const meanX = points.reduce((sum, point) => sum + point.x, 0) / points.length;
@@ -387,6 +390,11 @@ function RegressionScatterSvg({
           Math.ceil(residualExtent),
         ]
       : [0, 1, 2, 3, 4, 5];
+  const squareLegendItems = [
+    sst ? { key: "sst", label: "SST", className: "reg1intro-sst-square" } : null,
+    ssr ? { key: "ssr", label: "SSR", className: "reg1intro-ssr-square" } : null,
+    sse ? { key: "sse", label: "SSE", className: "reg1intro-sse-square" } : null,
+  ].filter(Boolean);
 
   const estimateAngle = Math.atan(SLOPE);
   const interceptPointX = xToPx(0);
@@ -410,7 +418,7 @@ function RegressionScatterSvg({
     .map((item) => item.index);
   const displayedIntercept = showEstimateMode ? INTERCEPT : olsIntercept;
   const displayedSlope = showEstimateMode ? SLOPE : olsSlope;
-  const equationLabel = `Y = ${displayedIntercept.toFixed(3)} + ${displayedSlope.toFixed(3)} X`;
+  const equationLabel = `Ŷ = ${displayedIntercept.toFixed(3)} + ${displayedSlope.toFixed(3)}X`;
 
   const olsVisibleIndices = new Set(
     fixedOrderIndices.slice(0, olsVisibleCount)
@@ -845,6 +853,21 @@ function RegressionScatterSvg({
           X
         </text>
       ) : null}
+      {showOlsModes && showSquares && squareLegendItems.length > 0 ? (
+        <g
+          className="reg1intro-square-legend"
+          transform={`translate(${paddingLeft + 14}, ${paddingTop + 10})`}
+        >
+          {squareLegendItems.map((item, index) => (
+            <g key={item.key} transform={`translate(0, ${index * 24})`}>
+              <rect x="0" y="0" width="14" height="14" rx="4" className={item.className} />
+              <text x="22" y="11" className="reg1intro-square-legend-label">
+                {item.label}
+              </text>
+            </g>
+          ))}
+        </g>
+      ) : null}
       <text x="22" y={height / 2} className="reg1intro-axis-label" textAnchor="middle" transform={`rotate(-90 22 ${height / 2})`}>
         {showRejectionMode && !showRejectionStepOne ? "잔차" : "Y"}
       </text>
@@ -853,6 +876,7 @@ function RegressionScatterSvg({
 }
 
 export default function Regression1OlsIntroPage() {
+  const mobileFit = useMobileFitScale(820, 560);
   const points = useMemo(() => REG1_OLS_POINTS, []);
   const [mode, setMode] = useState(MODE_ESTIMATE);
   const [step, setStep] = useState(0);
@@ -870,14 +894,14 @@ export default function Regression1OlsIntroPage() {
 
   const formulaDisplay =
     step >= 4
-      ? { abstract: "Y=a+bX+e", actual: "Ŷ=1.796 + 0.551X + 오차" }
+      ? { abstract: "Y = a + bX + e", actual: "Ŷ = 1.796 + 0.551X + 오차" }
       : step >= 3
-        ? { abstract: "Y=a+bX", actual: "Ŷ=1.796 + 0.551X" }
+        ? { abstract: "Y = a + bX", actual: "Ŷ = 1.796 + 0.551X" }
         : step >= 2
-          ? { abstract: "Y=a+ X", actual: "Ŷ=1.796 + X" }
+          ? { abstract: "Y = a + X", actual: "Ŷ = 1.796 + X" }
           : step >= 1
-            ? { abstract: "Y=   X", actual: "Ŷ= X" }
-            : { abstract: "Y=", actual: "Ŷ=" };
+            ? { abstract: "Y = X", actual: "Ŷ = X" }
+            : { abstract: "Y =", actual: "Ŷ =" };
 
   const meanX = points.reduce((sum, point) => sum + point.x, 0) / points.length;
   const meanY = points.reduce((sum, point) => sum + point.y, 0) / points.length;
@@ -944,6 +968,32 @@ export default function Regression1OlsIntroPage() {
     );
     return { slope, sse: sseValue };
   });
+  const mobileOlsVisibleVectors = fixedOrderIndices
+    .slice(0, points.length)
+    .map((index) => olsVectors.find((item) => item.index === index))
+    .filter(Boolean);
+  const mobileOlsSseSum = mobileOlsVisibleVectors.reduce((sum, item) => sum + (item.point.y - item.predicted) ** 2, 0);
+  const mobileOlsMse =
+    mobileOlsVisibleVectors.length > 2 ? mobileOlsSseSum / (mobileOlsVisibleVectors.length - 2) : 0;
+  const mobileCurveValues = Array.from({ length: 81 }, (_, index) => {
+    const slope = OLS_SLOPE_MIN + (index / 80) * (OLS_SLOPE_MAX - OLS_SLOPE_MIN);
+    const vectors = buildOlsVectors(points, slope);
+    const sseValue = vectors.reduce((sum, item) => sum + (item.point.y - item.predicted) ** 2, 0);
+    return { slope, sse: sseValue };
+  });
+  const mobileModelBaseVectors = buildOlsVectors(points, SLOPE);
+  const mobileModelVisibleVectors = fixedOrderIndices
+    .slice(0, points.length)
+    .map((index) => mobileModelBaseVectors.find((item) => item.index === index))
+    .filter(Boolean);
+  const mobileModelSstSum = mobileModelVisibleVectors.reduce((sum, item) => sum + (item.point.y - meanY) ** 2, 0);
+  const mobileModelSsrSum = mobileModelVisibleVectors.reduce((sum, item) => sum + (item.predicted - meanY) ** 2, 0);
+  const mobileModelSseSum = mobileModelVisibleVectors.reduce((sum, item) => sum + (item.point.y - item.predicted) ** 2, 0);
+  const mobileModelMsr = mobileModelVisibleVectors.length > 0 ? mobileModelSsrSum : 0;
+  const mobileModelMse =
+    mobileModelVisibleVectors.length > 2 ? mobileModelSseSum / (mobileModelVisibleVectors.length - 2) : 0;
+  const mobileModelFValue = mobileModelMse > 0 ? mobileModelMsr / mobileModelMse : 0;
+  const mobileModelFCritical = approximateFCritical(MODEL_ALPHA, 1, Math.max(mobileModelVisibleVectors.length - 2, 1));
   const graphTitle =
     mode === MODE_REJECTION
       ? rejectionStep === 1
@@ -957,12 +1007,232 @@ export default function Regression1OlsIntroPage() {
           ? "모형의 설명력과 유의성"
           : "회귀식";
 
+  const mobileSections = [
+    {
+      id: "estimate",
+      groupTitle: "OLS와 최소제곱법",
+      sectionTitle: "추정과 오차",
+      content: (
+        <>
+          <div className="reg1intro-plot-wrap reg1intro-mobile-plot">
+            <RegressionScatterSvg
+              points={points}
+              mode={MODE_ESTIMATE}
+              step={4}
+              sst={false}
+              ssr={false}
+              sse={false}
+              olsVisibleCount={0}
+              showSquares={false}
+              showErrorValues={false}
+              olsAngleProgress={DEFAULT_OLS_ANGLE_PROGRESS}
+              rejectionX={0}
+              rejectionStep={1}
+              showAllRejectionCurves={false}
+              compact
+            />
+          </div>
+          <div className="reg1intro-control-card reg1intro-formula-card">
+            <p className="reg1intro-formula-abstract">Y = a + bX + e</p>
+            <p className="reg1intro-formula-actual">Ŷ = 1.796 + 0.551X + 오차</p>
+          </div>
+        </>
+      ),
+    },
+    {
+      id: "ols",
+      groupTitle: "OLS와 최소제곱법",
+      sectionTitle: "최소제곱법",
+      content: (
+        <>
+          <div className="reg1intro-plot-wrap reg1intro-mobile-plot">
+            <RegressionScatterSvg
+              points={points}
+              mode={MODE_OLS}
+              step={0}
+              sst={false}
+              ssr={false}
+              sse
+              olsVisibleCount={30}
+              showSquares
+              showErrorValues={false}
+              olsAngleProgress={olsAngleProgress}
+              rejectionX={0}
+              rejectionStep={1}
+              showAllRejectionCurves={false}
+              compact
+            />
+          </div>
+          <div className="reg1intro-bottom-slider reg1intro-mobile-slider">
+            <label className="reg1intro-control-label" htmlFor="reg1intro-mobile-angle-slider">
+              회귀선 각도
+            </label>
+            <input
+              id="reg1intro-mobile-angle-slider"
+              className="reg1intro-slider"
+              type="range"
+              min="0"
+              max="100"
+              value={Math.round(olsAngleProgress * 100)}
+              onChange={(event) => setOlsAngleProgress(Number(event.target.value) / 100)}
+            />
+          </div>
+          <div className="reg1intro-mobile-panel">
+            <div className="reg1intro-ols-metrics">
+              <div className="reg1intro-ols-metric-row">
+                <div className="reg1intro-ols-metric-cell">
+                  <span>SSE</span>
+                  <strong>{mobileOlsSseSum.toFixed(2)}</strong>
+                </div>
+                <div className="reg1intro-ols-metric-cell">
+                  <span>MSE (df={Math.max(mobileOlsVisibleVectors.length - 2, 0)})</span>
+                  <strong>{mobileOlsMse.toFixed(2)}</strong>
+                </div>
+              </div>
+            </div>
+            <div className="reg1intro-control-card">
+              <OlsErrorCurve width={360} height={220} values={mobileCurveValues} currentSlope={olsSlope} showCurrentPoint />
+            </div>
+          </div>
+        </>
+      ),
+    },
+    {
+      id: "model",
+      groupTitle: "OLS와 최소제곱법",
+      sectionTitle: "모형의 설명력과 유의성",
+      content: (
+        <div className="reg1intro-mobile-rejection-stack">
+          <article className="rr-graph-card reg1intro-mobile-subsection">
+            <div className="rr-graph-head reg1intro-mobile-subhead">
+              <div>
+                <p className="panel-label">Graph</p>
+                <h3>R제곱</h3>
+              </div>
+            </div>
+            <div className="reg1intro-plot-wrap reg1intro-mobile-plot">
+              <RegressionScatterSvg
+                points={points}
+                mode={MODE_MODEL}
+                step={0}
+                sst
+                ssr
+                sse={false}
+                olsVisibleCount={points.length}
+                showSquares
+                showErrorValues={false}
+                olsAngleProgress={DEFAULT_OLS_ANGLE_PROGRESS}
+                rejectionX={0}
+                rejectionStep={1}
+                showAllRejectionCurves={false}
+                compact
+              />
+            </div>
+            <div className="reg1intro-control-card reg1intro-model-formula-card reg1intro-mobile-formula-only">
+              <div className="reg1intro-model-formula-block">
+                <p className="reg1intro-model-formula-abstract">R² = SSR / SST</p>
+              </div>
+            </div>
+          </article>
+          <article className="rr-graph-card reg1intro-mobile-subsection">
+            <div className="rr-graph-head reg1intro-mobile-subhead">
+              <div>
+                <p className="panel-label">Graph</p>
+                <h3>F</h3>
+              </div>
+            </div>
+            <div className="reg1intro-plot-wrap reg1intro-mobile-plot reg1intro-mobile-fplot">
+              <RegressionScatterSvg
+                points={points}
+                mode={MODE_MODEL}
+                step={0}
+                sst={false}
+                ssr
+                sse
+                olsVisibleCount={points.length}
+                showSquares
+                showErrorValues={false}
+                olsAngleProgress={DEFAULT_OLS_ANGLE_PROGRESS}
+                rejectionX={0}
+                rejectionStep={1}
+                showAllRejectionCurves={false}
+                compact
+              />
+            </div>
+            <div className="reg1intro-control-card reg1intro-model-formula-card reg1intro-mobile-formula-only">
+              <div className="reg1intro-model-formula-block">
+                <p className="reg1intro-model-formula-abstract">F = MSR / MSE</p>
+                <p className="reg1intro-model-formula-note">MSR = SSR / df, MSE = SSE / df</p>
+              </div>
+            </div>
+          </article>
+        </div>
+      ),
+    },
+    {
+      id: "rejection",
+      groupTitle: "OLS와 최소제곱법",
+      sectionTitle: "잔차와 기본가정",
+      content: (
+        <div className="reg1intro-mobile-rejection-stack">
+          {[
+            { id: "residual", title: "잔차", stepValue: 1 },
+            { id: "residual-plot", title: "잔차 그래프", stepValue: 2 },
+            { id: "residual-dist", title: "잔차 분포 그래프", stepValue: 3 },
+          ].map((item) => (
+            <article key={item.id} className="rr-graph-card reg1intro-mobile-subsection">
+              <div className="rr-graph-head reg1intro-mobile-subhead">
+                <div>
+                  <p className="panel-label">Graph</p>
+                  <h3>{item.title}</h3>
+                </div>
+              </div>
+              <div className="reg1intro-plot-wrap reg1intro-mobile-plot">
+                <RegressionScatterSvg
+                  points={points}
+                  mode={MODE_REJECTION}
+                  step={0}
+                  sst={false}
+                  ssr={false}
+                  sse={false}
+                  olsVisibleCount={0}
+                  showSquares={false}
+                  showErrorValues={false}
+                  olsAngleProgress={DEFAULT_OLS_ANGLE_PROGRESS}
+                  rejectionX={rejectionX}
+                  rejectionStep={item.stepValue}
+                  showAllRejectionCurves
+                  compact
+                />
+              </div>
+              <div className="reg1intro-bottom-slider reg1intro-mobile-slider">
+                <label className="reg1intro-control-label" htmlFor={`reg1intro-mobile-rejection-slider-${item.id}`}>
+                  X 위치
+                </label>
+                <input
+                  id={`reg1intro-mobile-rejection-slider-${item.id}`}
+                  className="reg1intro-slider"
+                  type="range"
+                  min="0"
+                  max="5"
+                  step="0.01"
+                  value={rejectionX}
+                  onChange={(event) => setRejectionX(Number(event.target.value))}
+                />
+              </div>
+            </article>
+          ))}
+        </div>
+      ),
+    },
+  ];
+
   return (
     <main className="rr-shell reg1intro-shell">
       <header className="rr-header reg1intro-header">
         <div>
           <p className="eyebrow">GRAPH</p>
-          <h1>회귀분석 1</h1>
+          <h1>OLS와 최소제곱법</h1>
         </div>
         <div className="lab-header-action-stack">
           <Link className="secondary-button regswitch-home-button" href="/lab">
@@ -1398,17 +1668,22 @@ export default function Regression1OlsIntroPage() {
                           {rSquared.toFixed(3)} = {ssrSum.toFixed(2)} / {sstSum.toFixed(2)}
                         </p>
                       </div>
-                      <div className="reg1intro-model-formula-block">
-                        <p className="reg1intro-model-formula-abstract">F = MSR / MSE</p>
-                        <p className="reg1intro-model-formula-actual">
-                          {fValue.toFixed(2)} = {msr.toFixed(2)} / {mse.toFixed(2)}
-                        </p>
-                      </div>
                     </div>
                   ) : (
-                    <div className="reg1intro-control-card">
-                      <FDistributionCurve width={360} height={200} fValue={fValue} criticalValue={fCritical} />
-                    </div>
+                    <>
+                      <div className="reg1intro-control-card">
+                        <FDistributionCurve width={360} height={200} fValue={fValue} criticalValue={fCritical} />
+                      </div>
+                      <div className="reg1intro-control-card reg1intro-model-formula-card">
+                        <div className="reg1intro-model-formula-block">
+                          <p className="reg1intro-model-formula-abstract">F = MSR / MSE</p>
+                          <p className="reg1intro-model-formula-actual">
+                            {fValue.toFixed(2)} = {msr.toFixed(2)} / {mse.toFixed(2)}
+                          </p>
+                          <p className="reg1intro-model-formula-note">MSR = SSR / df, MSE = SSE / df</p>
+                        </div>
+                      </div>
+                    </>
                   )}
                 </>
               )}
@@ -1425,6 +1700,39 @@ export default function Regression1OlsIntroPage() {
           </div>
         </aside>
       </section>
+
+      <div
+        ref={mobileFit.frameRef}
+        className="reg1intro-mobile-fit-frame"
+        data-ready={mobileFit.ready ? "true" : "false"}
+        style={mobileFit.height ? { height: `${mobileFit.height}px` } : undefined}
+      >
+        <div
+          ref={mobileFit.contentRef}
+          className="reg1intro-mobile-fit-inner"
+          data-ready={mobileFit.ready ? "true" : "false"}
+          style={{ transform: `scale(${mobileFit.scale})` }}
+        >
+          <section className="reg1intro-mobile-stack">
+            {mobileSections.map((section) => (
+              <article key={section.id} className="rr-graph-card reg1intro-mobile-section">
+                <div className="rr-graph-head reg1intro-mobile-head">
+                  <div>
+                    <p className="panel-label">{section.groupTitle}</p>
+                    <h2>{section.sectionTitle}</h2>
+                  </div>
+                </div>
+                {section.content}
+              </article>
+            ))}
+            <div className="reg1intro-mobile-footer">
+              <Link className="secondary-button regswitch-home-button" href="/lab">
+                메인으로
+              </Link>
+            </div>
+          </section>
+        </div>
+      </div>
     </main>
   );
 }

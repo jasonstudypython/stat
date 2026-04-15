@@ -104,7 +104,6 @@ Basic deploy flow:
 - [app/lab/mean-difference-distribution/page.js](D:/project/lecture/app/lab/mean-difference-distribution/page.js)
 - [app/lab/multiple-regression-collinearity/page.js](D:/project/lecture/app/lab/multiple-regression-collinearity/page.js)
 - [app/lab/regression-1-ols-intro/page.js](D:/project/lecture/app/lab/regression-1-ols-intro/page.js)
-- [app/lab/regression-3d/page.js](D:/project/lecture/app/lab/regression-3d/page.js)
 - [app/lab/rotating-regression/page.js](D:/project/lecture/app/lab/rotating-regression/page.js)
 - [app/lab/sample-mean-distribution/page.js](D:/project/lecture/app/lab/sample-mean-distribution/page.js)
 - [app/lab/t-f-analysis/page.js](D:/project/lecture/app/lab/t-f-analysis/page.js)
@@ -123,6 +122,9 @@ Basic deploy flow:
 - [app/lab/_shared/csv.js](D:/project/lecture/app/lab/_shared/csv.js)
   - shared browser CSV download helper
   - current convention is to export jamovi-friendly CSV columns
+- [app/lab/_shared/useMobileFitScale.js](D:/project/lecture/app/lab/_shared/useMobileFitScale.js)
+  - shared mobile scaling hook for slide-like fixed-width lecture layouts
+  - used when a page keeps desktop composition but must fit mobile width
 
 ## 6. Page Implementation Patterns
 
@@ -307,6 +309,96 @@ If the page has downloadable source data:
     - `gender-moderation-effect`: staged moderation explanation cards / badges
     - `mediation-effect`, `multiple-regression-collinearity`: shared right-panel table style
 
+## 11A. Mobile Optimization Conventions
+
+Recent work introduced a consistent mobile strategy for core lecture pages.
+
+### Guiding principle
+
+- Desktop keeps the original exploratory / interactive layout
+- Mobile prefers guided, lecture-style reading order
+- When a page has many toggles, mobile may:
+  - hide the large header card
+  - hide non-essential controls
+  - expand key states sequentially
+  - move `메인으로` to the bottom only
+
+### Two mobile patterns
+
+#### A. Sequential teaching stack
+
+Used when the page is conceptually step-based.
+
+Examples:
+- [app/lab/multiple-regression-collinearity/page.js](D:/project/lecture/app/lab/multiple-regression-collinearity/page.js)
+- [app/lab/mediation-effect/page.js](D:/project/lecture/app/lab/mediation-effect/page.js)
+- [app/lab/gender-moderation-effect/page.js](D:/project/lecture/app/lab/gender-moderation-effect/page.js)
+- [app/lab/t-f-analysis/page.js](D:/project/lecture/app/lab/t-f-analysis/page.js)
+- [app/lab/basic-stats-1-scatter-bridge/page.js](D:/project/lecture/app/lab/basic-stats-1-scatter-bridge/page.js)
+
+Typical behavior:
+- desktop `rr-header` or equivalent is hidden on mobile
+- sections are rendered as a mobile-only stack
+- repeated card content is reduced to only stage-specific information
+- CSV download buttons are usually hidden on mobile
+
+#### B. Fixed-width fit scaling
+
+Used when the desktop composition itself is important and should be preserved visually.
+
+Helper:
+- [app/lab/_shared/useMobileFitScale.js](D:/project/lecture/app/lab/_shared/useMobileFitScale.js)
+
+Typical behavior:
+- content keeps a fixed internal width
+- outer frame scales it down to mobile width
+- avoids reflowing complex graph + card compositions
+
+### Mobile-first page notes
+
+- `multiple-regression-collinearity`
+  - mobile uses a sequential stack of 5 states
+  - header is hidden
+  - `메인으로` appears only at the bottom
+- `mediation-effect`
+  - mobile uses 3 ordered stages
+  - header is hidden
+- `gender-moderation-effect`
+  - mobile no longer repeats all prior formula blocks
+  - each stage shows only unique explanatory content
+- `t-f-analysis`
+  - mobile uses ordered `t` / `F` comparison + distribution sections
+  - `통계량 표시` defaults to on
+- `rotating-regression`
+  - mobile keeps live slider interaction
+  - order is `graphs -> slider -> metric cards`
+- `sample-mean-distribution`
+  - top controls are compacted into a shallow 2-column control block
+  - run button is integrated next to the slider on mobile
+- `korean-height-distribution`
+  - mobile hides the desktop header
+  - transformation is kept at the top
+  - group views are shown sequentially
+- `mean-difference-distribution`
+  - mobile uses dropdowns instead of button toggles
+  - left population plot height is independently tuned from the right t-distribution plot
+
+### Important CSS prefixes for mobile work
+
+- `.multireg2-*`
+- `.mediation-*`
+- `.modlab-*`
+- `.tf-*`
+- `.rr-rotating-*`
+- `.scatter-bridge-*`
+- `.samplemean-*`
+- `.heightdist-*`
+- `.meandiff-*`
+- `.reg1intro-*`
+- `.basicreg-*`
+
+When debugging mobile issues, prefer page-prefixed rules inside `@media (max-width: 820px)` rather than broad generic overrides.
+
 ## 12. Deploy Checklist
 
 Before pushing to GitHub / Vercel:
@@ -337,6 +429,7 @@ npm.cmd run build
 - moderation pages may have stage-specific graph titles, formula cards, and plot mode toggles, so text should be checked per stage rather than per page only
 - if jamovi comparison is needed, use the CSV export file in `exports/` instead of regenerating ad hoc data
 - duplicated seeded-random / matrix helper functions currently exist across several new pages; if future maintenance touches them together, consider extracting a shared utility module after verifying all lecture numbers still match
+- `regression-3d` route has been removed and should not be reintroduced unless it is added back to the `/lab` index intentionally
 
 ## 12. Practical Maintenance Checklist
 

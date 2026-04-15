@@ -40,10 +40,16 @@ D:\project\lecture 프로젝트 계속 작업.
 Recent maintenance notes (2026-04):
 - Shared pure stats helpers now live in `D:\project\lecture\app\lab\_shared\stats.js`
 - Shared CSV download helper now lives in `D:\project\lecture\app\lab\_shared\csv.js`
+- Shared mobile fit helper now lives in `D:\project\lecture\app\lab\_shared\useMobileFitScale.js`
 - Header CSV download buttons are jamovi-oriented and use normal browser download
 - Common header button press styling is controlled by:
   - `.lab-header-action-stack`
   - `.lab-header-actions`
   - `.modlab-header-actions`
+- Core mobile-optimized pages now mix two patterns:
+  - sequential teaching stacks for stage-based pages
+  - fixed-width fit scaling for visually dense pages
+- Mobile work should prefer page-prefixed rules in `app/globals.css` under `@media (max-width: 820px)`
+- `regression-3d` has been removed from the app and from `/lab`
 - `t-f-analysis` uses a custom compressed t-axis when `통계량 표시` is on
 - `rotating-regression` metrics row and labels have page-specific CSS coupling

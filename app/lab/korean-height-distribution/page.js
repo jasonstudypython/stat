@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import rawHeightData from "../../../data_mdis_height.json";
 import { downloadCsv } from "../_shared/csv";
 
@@ -159,10 +159,10 @@ function histogramBinSpec(mode, rawMean, rawStd) {
 
 function createTickSpec(mode, range) {
   if (mode === "centered") {
-    return { tickmode: "linear", tick0: Math.floor(range[0] / 2.5) * 2.5, dtick: 2.5 };
+    return { tickmode: "linear", tick0: Math.floor(range[0] / 10) * 10, dtick: 10 };
   }
   if (mode === "zscore") {
-    return { tickmode: "linear", tick0: Math.floor(range[0]), dtick: 1 };
+    return { tickmode: "linear", tick0: Math.floor(range[0] / 2) * 2, dtick: 2 };
   }
   return {};
 }
@@ -225,6 +225,14 @@ export default function KoreanHeightDistributionPage() {
   const [showStdBand, setShowStdBand] = useState(false);
   const [show95, setShow95] = useState(false);
   const [show99, setShow99] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
+
+  useEffect(() => {
+    const updateViewport = () => setIsMobileViewport(window.innerWidth <= 820);
+    updateViewport();
+    window.addEventListener("resize", updateViewport);
+    return () => window.removeEventListener("resize", updateViewport);
+  }, []);
 
   const grouped = useMemo(() => {
     const male = rawHeightData.filter((row) => row.sex === "남").map((row) => Number(row.height));
@@ -529,6 +537,249 @@ export default function KoreanHeightDistributionPage() {
     });
   }, [activeKeys, prepared, show95, show99, showStdBand]);
 
+  const mobileSections = useMemo(() => {
+    const configs = [
+      { key: "male", groupMode: "male", scaleMode: "frequency", title: "남성" },
+      { key: "female", groupMode: "female", scaleMode: "frequency", title: "여성" },
+      { key: "both", groupMode: "both", scaleMode: "density", title: "전체" },
+    ];
+
+    return configs.map((config) => {
+      const sectionKeys = config.groupMode === "both" ? ["male", "female"] : [config.groupMode];
+      const sectionPrepared = {};
+
+      for (const key of sectionKeys) {
+        const source = grouped[key];
+        const values = transformValues(source, transformMode);
+        sectionPrepared[key] = {
+          values,
+          rawMean: mean(source),
+          rawStd: standardDeviation(source) || 1,
+          mean: mean(values),
+          std: standardDeviation(values) || 1,
+          bandwidth: bandwidthFrom(values),
+        };
+      }
+
+      const comparisonValues =
+        transformMode === "raw"
+          ? sectionKeys.flatMap((key) => sectionPrepared[key].values)
+          : (config.groupMode === "both" ? ["male", "female"] : sectionKeys).flatMap((key) =>
+              transformValues(grouped[key], transformMode),
+            );
+
+      const sectionRange = formatRange(transformMode, comparisonValues);
+      const sectionTickSpec = createTickSpec(transformMode, sectionRange);
+      const sectionGrid = Array.from(
+        { length: 240 },
+        (_, index) => sectionRange[0] + ((sectionRange[1] - sectionRange[0]) * index) / 239,
+      );
+      const isDensitySection = config.scaleMode === "density";
+      const sectionTraces = [];
+
+      for (const key of sectionKeys) {
+        const meta = GROUPS[key];
+        const current = sectionPrepared[key];
+        const currentBin = histogramBinSpec(transformMode, current.rawMean, current.rawStd);
+
+        sectionTraces.push({
+          type: "histogram",
+          name: meta.label,
+          x: current.values,
+          opacity: config.groupMode === "both" ? 0.56 : 0.78,
+          histnorm: isDensitySection ? "probability density" : "",
+          marker: { color: meta.color, line: { color: meta.line, width: 1 } },
+          xbins: currentBin,
+          hovertemplate: `${meta.label}<br>x=%{x:.2f}<br>${isDensitySection ? "밀도" : "빈도"}=%{y:.3f}<extra></extra>`,
+        });
+
+        const curveY = sectionGrid.map((x) =>
+          normalPdf(x, current.mean, current.std) *
+          (isDensitySection ? 1 : current.values.length * currentBin.size),
+        );
+
+        const low = current.mean - 1.96 * current.std;
+        const high = current.mean + 1.96 * current.std;
+        const leftXs = sectionGrid.filter((x) => x <= low);
+        const rightXs = sectionGrid.filter((x) => x >= high);
+        const leftTrace = buildTailTrace({
+          label: `${meta.label} 95% 신뢰구간`,
+          color: meta.fill95,
+          xValues: leftXs,
+          yValues: leftXs.map((x) =>
+            normalPdf(x, current.mean, current.std) *
+            (isDensitySection ? 1 : current.values.length * currentBin.size),
+          ),
+        });
+        const rightTrace = buildTailTrace({
+          label: `${meta.label} 95% 신뢰구간`,
+          color: meta.fill95,
+          xValues: rightXs,
+          yValues: rightXs.map((x) =>
+            normalPdf(x, current.mean, current.std) *
+            (isDensitySection ? 1 : current.values.length * currentBin.size),
+          ),
+        });
+        if (leftTrace) sectionTraces.push(leftTrace);
+        if (rightTrace) sectionTraces.push(rightTrace);
+
+        sectionTraces.push({
+          type: "scatter",
+          mode: "lines",
+          name: `${meta.label} 정규분포곡선`,
+          x: sectionGrid,
+          y: curveY,
+          line: { color: meta.line, width: 3 },
+          hovertemplate: `${meta.label} 정규분포곡선<br>x=%{x:.2f}<br>y=%{y:.3f}<extra></extra>`,
+        });
+      }
+
+      const sectionShapes = sectionKeys.map((key) => {
+        const meta = GROUPS[key];
+        const current = sectionPrepared[key];
+        return {
+          type: "line",
+          xref: "x",
+          yref: "paper",
+          x0: current.mean,
+          x1: current.mean,
+          y0: 0,
+          y1: 1,
+          line: { color: meta.line, width: 2, dash: "dot" },
+        };
+      });
+
+      const sectionMetrics = sectionKeys.map((key) => {
+        const meta = GROUPS[key];
+        const current = sectionPrepared[key];
+        return {
+          key,
+          label: meta.label,
+          mean: current.mean,
+          std: current.std,
+          median: median(current.values),
+          n: current.values.length,
+          low95: current.mean - 1.96 * current.std,
+          high95: current.mean + 1.96 * current.std,
+        };
+      });
+
+      return {
+        ...config,
+        plot: {
+          data: sectionTraces,
+          layout: {
+            autosize: true,
+            barmode: config.groupMode === "both" ? "overlay" : "relative",
+            bargap: 0.03,
+            paper_bgcolor: "rgba(0,0,0,0)",
+            plot_bgcolor: "rgba(255,255,255,0.98)",
+            font: { family: "Pretendard, Noto Sans KR, sans-serif", color: "#112d4e", size: 16 },
+            margin: { l: 72, r: 28, t: 24, b: 72 },
+            legend: {
+              orientation: "h",
+              x: 0,
+              y: 1.12,
+              bgcolor: "rgba(255,255,255,0.0)",
+            },
+            shapes: sectionShapes,
+            xaxis: {
+              title: { text: formatAxisLabel(transformMode), standoff: 18 },
+              range: sectionRange,
+              showgrid: true,
+              gridcolor: "rgba(17,45,78,0.08)",
+              zeroline: transformMode !== "raw",
+              zerolinecolor: "rgba(17,45,78,0.18)",
+              tickfont: { size: 14 },
+              ...sectionTickSpec,
+            },
+            yaxis: {
+              title: { text: isDensitySection ? "밀도" : "빈도", standoff: 14 },
+              rangemode: "tozero",
+              showgrid: true,
+              gridcolor: "rgba(17,45,78,0.08)",
+              tickfont: { size: 14 },
+            },
+            hovermode: "x unified",
+            showlegend: true,
+            uirevision: `heightdist-mobile-${config.groupMode}-${transformMode}-${config.scaleMode}`,
+          },
+        },
+        metrics: sectionMetrics,
+      };
+    });
+  }, [grouped, transformMode]);
+
+  if (isMobileViewport) {
+    return (
+      <main className="rr-shell regswitch-shell heightdist-shell heightdist-mobile-shell">
+        <section className="heightdist-mobile-transform">
+          <span>변환</span>
+          <select
+            className="heightdist-select"
+            value={transformMode}
+            onChange={(event) => setTransformMode(event.target.value)}
+          >
+            <option value="raw">원자료</option>
+            <option value="centered">평균중심화</option>
+            <option value="zscore">표준점수</option>
+          </select>
+        </section>
+
+        <div className="heightdist-mobile-stack">
+          {mobileSections.map((section) => (
+            <section key={section.key} className="heightdist-mobile-section">
+              <div className="heightdist-mobile-head">
+                <p className="panel-label">Graph</p>
+                <h2 className="regswitch-title">대한민국 성인 {section.title} 키 분포</h2>
+                <p className="regswitch-formula">
+                  히스토그램 / {section.scaleMode === "density" ? "밀도" : "빈도"}
+                </p>
+              </div>
+
+              <div className="regswitch-plot-wrap is-subplot heightdist-plot-wrap">
+                <Plot
+                  data={section.plot.data}
+                  layout={section.plot.layout}
+                  config={{
+                    displayModeBar: false,
+                    responsive: true,
+                    showTips: true,
+                    doubleClick: "reset+autosize",
+                  }}
+                  style={{ width: "100%", height: "100%" }}
+                />
+              </div>
+
+              <section className="heightdist-metrics heightdist-mobile-metrics">
+                {section.metrics.map((card) => (
+                  <article key={`${section.key}-${card.key}`}>
+                    <span>{card.label}</span>
+                    <strong>
+                      {[
+                        `평균 ${card.mean.toFixed(2)}`,
+                        `표준편차 ${card.std.toFixed(2)}`,
+                        `중앙값 ${card.median.toFixed(2)}`,
+                        `N ${card.n}`,
+                        `95% CI ${card.low95.toFixed(2)} ~ ${card.high95.toFixed(2)}`,
+                      ].join(" / ")}
+                    </strong>
+                  </article>
+                ))}
+              </section>
+            </section>
+          ))}
+        </div>
+
+        <div className="heightdist-mobile-footer">
+          <Link className="secondary-button regswitch-home-button" href="/lab">
+            메인으로
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="rr-shell regswitch-shell heightdist-shell">
       <header className="rr-header heightdist-header">
@@ -628,6 +879,8 @@ export default function KoreanHeightDistributionPage() {
               config={{
                 displayModeBar: false,
                 responsive: true,
+                showTips: true,
+                doubleClick: "reset+autosize",
               }}
               style={{ width: "100%", height: "100%" }}
             />

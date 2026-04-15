@@ -7,7 +7,7 @@ const LAB_PAGES = [
     href: "/lab/basic-stats-1-scatter-bridge",
     eyebrow: "INTRODUCTION",
     title: "공부시간과 성적 분포",
-    description: "X 데이터 / 평균선 / 회귀선 / 예측값",
+    description: "Y 데이터 / 평균선 / 회귀선 / 예측값",
     accent: "is-lilac",
   },
   {
@@ -42,13 +42,13 @@ const LAB_PAGES = [
     href: "/lab/t-f-analysis",
     eyebrow: "BASIC STATISTICS",
     title: "t검정과 F검정",
-    description: "t검정 / F검정 / 알파수준 / 지터 표시",
+    description: "t검정 / F검정 / 알파레벨 / 통계량 표시",
     accent: "is-coral",
   },
   {
     href: "/lab/mean-difference-distribution",
     eyebrow: "BASIC STATISTICS",
-    title: "집단간 평균 차이 분포",
+    title: "영가설 분포",
     description: "실제 분포 / 영가설 분포 / t분포 / 표집 크기",
     accent: "is-blue",
   },
@@ -135,7 +135,7 @@ export default function LabIndexPage() {
       </section>
 
       <footer className="site-footer site-footer-lab">
-        <p>© 2026 김준성. All rights reserved.</p>
+        <p>ⓒ 2026 김준성. All rights reserved.</p>
       </footer>
     </main>
   );
