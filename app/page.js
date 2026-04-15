@@ -5,8 +5,8 @@ function HeroGraphVisual() {
     <svg viewBox="0 0 560 360" className="home-hero-visual" aria-hidden="true">
       <defs>
         <linearGradient id="heroLine" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#8aaedb" />
-          <stop offset="100%" stopColor="#f07b54" />
+          <stop offset="0%" stopColor="var(--home-hero-line-start)" />
+          <stop offset="100%" stopColor="var(--home-hero-line-end)" />
         </linearGradient>
       </defs>
 
@@ -75,17 +75,17 @@ function GraphLabCardVisual() {
     <svg viewBox="0 0 320 210" className="home-link-visual" aria-hidden="true">
       <defs>
         <linearGradient id="homeCardBlue" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#dce7f8" />
-          <stop offset="100%" stopColor="#8cb0df" />
+          <stop offset="0%" stopColor="var(--home-card-blue-start)" />
+          <stop offset="100%" stopColor="var(--home-card-blue-end)" />
         </linearGradient>
       </defs>
       <rect x="18" y="18" width="284" height="174" rx="28" fill="url(#homeCardBlue)" opacity="0.95" />
-      <line x1="48" y1="160" x2="270" y2="160" stroke="#17355d" strokeWidth="4" strokeLinecap="round" />
-      <line x1="48" y1="46" x2="48" y2="160" stroke="#17355d" strokeWidth="4" strokeLinecap="round" />
+      <line x1="48" y1="160" x2="270" y2="160" stroke="var(--home-visual-axis)" strokeWidth="4" strokeLinecap="round" />
+      <line x1="48" y1="46" x2="48" y2="160" stroke="var(--home-visual-axis)" strokeWidth="4" strokeLinecap="round" />
       <path
         d="M58 146 L102 118 L140 124 L188 86 L232 94 L264 58"
         fill="none"
-        stroke="#ff7b7b"
+        stroke="var(--home-visual-accent)"
         strokeWidth="6"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -96,13 +96,21 @@ function GraphLabCardVisual() {
           cx={x}
           cy={[146, 118, 124, 86, 94, 58][index]}
           r="8.5"
-          fill="#ffffff"
-          stroke="#3f72af"
+          fill="var(--home-visual-surface)"
+          stroke="var(--home-visual-dot-stroke)"
           strokeWidth="4"
         />
       ))}
-      <rect x="192" y="36" width="78" height="34" rx="17" fill="#17355d" />
-      <text x="231" y="58" textAnchor="middle" fill="#ffffff" fontSize="18" fontWeight="800">
+      <rect x="192" y="36" width="78" height="34" rx="17" fill="var(--home-visual-axis)" />
+      <text
+        x="231"
+        y="58"
+        textAnchor="middle"
+        fill="var(--home-visual-surface)"
+        fontSize="18"
+        fontWeight="800"
+        className="home-link-visual-text"
+      >
         LAB
       </text>
     </svg>
@@ -114,22 +122,30 @@ function JamoviCardVisual() {
     <svg viewBox="0 0 320 210" className="home-link-visual" aria-hidden="true">
       <defs>
         <linearGradient id="homeCardGreen" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#e3f7ea" />
-          <stop offset="100%" stopColor="#99d9b3" />
+          <stop offset="0%" stopColor="var(--home-card-green-start)" />
+          <stop offset="100%" stopColor="var(--home-card-green-end)" />
         </linearGradient>
       </defs>
       <rect x="18" y="18" width="284" height="174" rx="28" fill="url(#homeCardGreen)" opacity="0.96" />
-      <rect x="48" y="46" width="224" height="118" rx="22" fill="#ffffff" opacity="0.94" />
-      <rect x="62" y="62" width="104" height="12" rx="6" fill="#99d9b3" />
-      <rect x="62" y="88" width="84" height="12" rx="6" fill="#d9f1e3" />
-      <rect x="62" y="114" width="92" height="12" rx="6" fill="#d9f1e3" />
-      <rect x="188" y="72" width="18" height="64" rx="9" fill="#2a9d62" />
-      <rect x="214" y="96" width="18" height="40" rx="9" fill="#66bb8a" />
-      <rect x="240" y="82" width="18" height="54" rx="9" fill="#99d9b3" />
-      <circle cx="90" cy="146" r="10" fill="#2a9d62" opacity="0.18" />
-      <circle cx="120" cy="146" r="10" fill="#2a9d62" opacity="0.18" />
-      <circle cx="150" cy="146" r="10" fill="#2a9d62" opacity="0.18" />
-      <text x="160" y="184" textAnchor="middle" fill="#195338" fontSize="18" fontWeight="800">
+      <rect x="48" y="46" width="224" height="118" rx="22" fill="var(--home-visual-surface)" opacity="0.94" />
+      <rect x="62" y="62" width="104" height="12" rx="6" fill="var(--home-card-green-end)" />
+      <rect x="62" y="88" width="84" height="12" rx="6" fill="var(--home-card-green-soft)" />
+      <rect x="62" y="114" width="92" height="12" rx="6" fill="var(--home-card-green-soft)" />
+      <rect x="188" y="72" width="18" height="64" rx="9" fill="var(--home-card-green-strong)" />
+      <rect x="214" y="96" width="18" height="40" rx="9" fill="var(--home-card-green-mid)" />
+      <rect x="240" y="82" width="18" height="54" rx="9" fill="var(--home-card-green-end)" />
+      <circle cx="90" cy="146" r="10" fill="var(--home-card-green-strong)" opacity="0.18" />
+      <circle cx="120" cy="146" r="10" fill="var(--home-card-green-strong)" opacity="0.18" />
+      <circle cx="150" cy="146" r="10" fill="var(--home-card-green-strong)" opacity="0.18" />
+      <text
+        x="160"
+        y="184"
+        textAnchor="middle"
+        fill="var(--home-card-green-text)"
+        fontSize="18"
+        fontWeight="800"
+        className="home-link-visual-text"
+      >
         jamovi
       </text>
     </svg>
@@ -141,20 +157,28 @@ function ProcessCardVisual() {
     <svg viewBox="0 0 320 210" className="home-link-visual" aria-hidden="true">
       <defs>
         <linearGradient id="homeCardPeach" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#fde8df" />
-          <stop offset="100%" stopColor="#f4b79d" />
+          <stop offset="0%" stopColor="var(--home-card-peach-start)" />
+          <stop offset="100%" stopColor="var(--home-card-peach-end)" />
         </linearGradient>
       </defs>
       <rect x="18" y="18" width="284" height="174" rx="28" fill="url(#homeCardPeach)" opacity="0.96" />
-      <circle cx="90" cy="108" r="34" fill="#ffffff" opacity="0.92" />
-      <circle cx="90" cy="108" r="16" fill="#f07b54" opacity="0.88" />
-      <path d="M144 72 H248" stroke="#8a3f25" strokeWidth="8" strokeLinecap="round" />
-      <path d="M144 108 H224" stroke="#8a3f25" strokeWidth="8" strokeLinecap="round" />
-      <path d="M144 144 H258" stroke="#8a3f25" strokeWidth="8" strokeLinecap="round" />
-      <circle cx="266" cy="72" r="8" fill="#8a3f25" />
-      <circle cx="234" cy="108" r="8" fill="#8a3f25" />
-      <circle cx="276" cy="144" r="8" fill="#8a3f25" />
-      <text x="160" y="186" textAnchor="middle" fill="#6f2d17" fontSize="18" fontWeight="800">
+      <circle cx="90" cy="108" r="34" fill="var(--home-visual-surface)" opacity="0.92" />
+      <circle cx="90" cy="108" r="16" fill="var(--home-hero-line-end)" opacity="0.88" />
+      <path d="M144 72 H248" stroke="var(--home-card-peach-strong)" strokeWidth="8" strokeLinecap="round" />
+      <path d="M144 108 H224" stroke="var(--home-card-peach-strong)" strokeWidth="8" strokeLinecap="round" />
+      <path d="M144 144 H258" stroke="var(--home-card-peach-strong)" strokeWidth="8" strokeLinecap="round" />
+      <circle cx="266" cy="72" r="8" fill="var(--home-card-peach-strong)" />
+      <circle cx="234" cy="108" r="8" fill="var(--home-card-peach-strong)" />
+      <circle cx="276" cy="144" r="8" fill="var(--home-card-peach-strong)" />
+      <text
+        x="160"
+        y="186"
+        textAnchor="middle"
+        fill="var(--home-card-peach-text)"
+        fontSize="18"
+        fontWeight="800"
+        className="home-link-visual-text"
+      >
         PROCESS Macro
       </text>
     </svg>

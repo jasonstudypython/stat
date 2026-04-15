@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { createSeededRandom, mean, sampleNormal, standardDeviation } from "../_shared/stats";
 
 const POPULATION_OPTIONS = [
   { key: "normal", label: "정규형" },
@@ -29,35 +30,8 @@ const T_CRITICAL_LOOKUP = {
   },
 };
 
-function createSeededRandom(seed) {
-  let state = seed >>> 0;
-  return function nextRandom() {
-    state = (1664525 * state + 1013904223) >>> 0;
-    return state / 4294967296;
-  };
-}
-
-function sampleNormal(random, mean = 0, std = 1) {
-  const u1 = Math.max(random(), 1e-12);
-  const u2 = random();
-  const z0 = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-  return mean + z0 * std;
-}
-
 function roundToHalf(value) {
   return Math.round(value * 2) / 2;
-}
-
-function mean(values) {
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
-}
-
-function standardDeviation(values) {
-  if (values.length <= 1) return 0;
-  const avg = mean(values);
-  const variance =
-    values.reduce((sum, value) => sum + (value - avg) ** 2, 0) / Math.max(values.length - 1, 1);
-  return Math.sqrt(variance);
 }
 
 function normalPdf(x, avg, std) {

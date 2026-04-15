@@ -5,22 +5,10 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import fatData from "../../../data_mdis_fat.json";
 import { downloadCsv } from "../_shared/csv";
+import { mean, normalCdf, sampleVariance, standardDeviation } from "../_shared/stats";
 import { useMobileFitScale } from "../_shared/useMobileFitScale";
 
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
-
-function mean(values) {
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
-}
-
-function variance(values) {
-  const avg = mean(values);
-  return values.reduce((sum, value) => sum + (value - avg) ** 2, 0) / Math.max(values.length - 1, 1);
-}
-
-function standardDeviation(values) {
-  return Math.sqrt(variance(values));
-}
 
 function hexToRgba(hex, alpha) {
   const normalized = hex.replace("#", "");
@@ -28,27 +16,6 @@ function hexToRgba(hex, alpha) {
   const green = Number.parseInt(normalized.slice(2, 4), 16);
   const blue = Number.parseInt(normalized.slice(4, 6), 16);
   return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
-}
-
-function erf(x) {
-  const sign = x < 0 ? -1 : 1;
-  const absX = Math.abs(x);
-  const a1 = 0.254829592;
-  const a2 = -0.284496736;
-  const a3 = 1.421413741;
-  const a4 = -1.453152027;
-  const a5 = 1.061405429;
-  const p = 0.3275911;
-  const t = 1 / (1 + p * absX);
-  const y =
-    1 -
-    (((((a5 * t + a4) * t + a3) * t + a2) * t + a1) * t) *
-      Math.exp(-absX * absX);
-  return sign * y;
-}
-
-function normalCdf(x) {
-  return 0.5 * (1 + erf(x / Math.sqrt(2)));
 }
 
 function logGamma(z) {
@@ -154,8 +121,8 @@ export default function TFAnalysisPage() {
     const maleMean = mean(maleFat);
     const femaleMean = mean(femaleFat);
     const overallMean = mean([...maleFat, ...femaleFat]);
-    const maleVar = variance(maleFat);
-    const femaleVar = variance(femaleFat);
+    const maleVar = sampleVariance(maleFat);
+    const femaleVar = sampleVariance(femaleFat);
     const n1 = maleFat.length;
     const n2 = femaleFat.length;
     const ssBetween = n1 * (maleMean - overallMean) ** 2 + n2 * (femaleMean - overallMean) ** 2;

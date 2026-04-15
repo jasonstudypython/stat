@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { downloadCsv } from "../_shared/csv";
+import { mean } from "../_shared/stats";
 
 const X_VALUES = [1, 1.5, 2, 2.5, 3];
 const Y_VALUES = [1, 2, 2, 3, 3];
@@ -13,10 +14,6 @@ const SLOPE_STATES = [
   { slope: 2, label: "m = 2", rss: 2.8 },
   { slope: 3, label: "m = 3", rss: 10.3 },
 ];
-
-function mean(values) {
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
-}
 
 function fitOptimalLine(xValues, yValues) {
   const xMean = mean(xValues);
@@ -375,7 +372,7 @@ export default function RotatingRegressionPage() {
       <header className="rr-header">
         <div>
           <p className="eyebrow">GRAPH</p>
-          <h1>오차와 회귀선의 변화</h1>
+          <h1>회귀선과 오차의 변화</h1>
         </div>
         <div className="lab-header-action-stack">
           <Link className="secondary-button regswitch-home-button" href="/lab">
@@ -403,7 +400,7 @@ export default function RotatingRegressionPage() {
       <section className="rr-graphs">
         <article className="rr-graph-card">
           <div className="rr-graph-head">
-            <p className="panel-label">기울기 별 회귀선</p>
+            <p className="panel-label">회귀선의 기울기</p>
             <div className="rr-legend">
               <span className="is-optimal">최적 회귀선</span>
               <span className="is-current">현재 회귀선</span>
@@ -478,7 +475,7 @@ export default function RotatingRegressionPage() {
         <section className="rr-graphs">
           <article className="rr-graph-card">
             <div className="rr-graph-head">
-              <p className="panel-label">기울기 별 회귀선</p>
+              <p className="panel-label">회귀선의 기울기</p>
             </div>
             <RegressionPlot
               slope={currentSlope}

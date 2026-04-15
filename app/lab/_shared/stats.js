@@ -23,9 +23,18 @@ export function mean(values) {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
-export function standardDeviation(values, center) {
-  const variance = values.reduce((sum, value) => sum + (value - center) ** 2, 0) / (values.length - 1);
-  return Math.sqrt(variance);
+export function sampleVariance(values, center = mean(values)) {
+  if (values.length <= 1) return 0;
+  return values.reduce((sum, value) => sum + (value - center) ** 2, 0) / Math.max(values.length - 1, 1);
+}
+
+export function standardDeviation(values, center = mean(values)) {
+  return Math.sqrt(sampleVariance(values, center));
+}
+
+export function covariance(xValues, yValues, xMean = mean(xValues), yMean = mean(yValues)) {
+  if (xValues.length <= 1 || yValues.length <= 1) return 0;
+  return xValues.reduce((sum, value, index) => sum + (value - xMean) * (yValues[index] - yMean), 0) / Math.max(xValues.length - 1, 1);
 }
 
 export function solveMatrix(matrix, vector) {

@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import rawHeightData from "../../../data_mdis_height.json";
+import { createSeededRandom, mean, sampleNormal, sampleVariance, standardDeviation } from "../_shared/stats";
 
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
 
@@ -15,34 +16,6 @@ const CRITICAL_T_005 = {
   38: 2.024,
   58: 2.002,
 };
-
-function mean(values) {
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
-}
-
-function variance(values) {
-  const avg = mean(values);
-  return values.reduce((sum, value) => sum + (value - avg) ** 2, 0) / Math.max(values.length - 1, 1);
-}
-
-function standardDeviation(values) {
-  return Math.sqrt(variance(values));
-}
-
-function createSeededRandom(seed) {
-  let state = seed >>> 0;
-  return function nextRandom() {
-    state = (1664525 * state + 1013904223) >>> 0;
-    return state / 4294967296;
-  };
-}
-
-function sampleNormal(random, avg = 0, std = 1) {
-  const u1 = Math.max(random(), 1e-12);
-  const u2 = random();
-  const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-  return avg + z * std;
-}
 
 function logGamma(z) {
   const coefficients = [
@@ -123,8 +96,8 @@ function createSamplingRounds(malePopulation, femalePopulation, sampleSize, seed
     const femaleSample = sampleWithReplacement(femalePopulation, sampleSize, random);
     const maleMean = mean(maleSample);
     const femaleMean = mean(femaleSample);
-    const maleVar = variance(maleSample);
-    const femaleVar = variance(femaleSample);
+    const maleVar = sampleVariance(maleSample);
+    const femaleVar = sampleVariance(femaleSample);
     const pooledVariance = (((sampleSize - 1) * maleVar) + ((sampleSize - 1) * femaleVar)) / Math.max(2 * sampleSize - 2, 1);
     const standardError = Math.sqrt(pooledVariance * (2 / sampleSize));
     const diff = maleMean - femaleMean;
@@ -904,15 +877,15 @@ export default function MeanDifferenceDistributionPage() {
   const meanArrowMid = (malePopulationMean + femalePopulationMean) / 2;
   const pooledPopulationVariance =
     (
-      ((effectiveSampleSize - 1) * variance(populations.male)) +
-      ((effectiveSampleSize - 1) * variance(populations.female))
+      ((effectiveSampleSize - 1) * sampleVariance(populations.male)) +
+      ((effectiveSampleSize - 1) * sampleVariance(populations.female))
     ) / Math.max(2 * effectiveSampleSize - 2, 1);
   const effectiveStandardError = Math.sqrt(pooledPopulationVariance * (2 / effectiveSampleSize));
   const effectiveTValue = cardMeanDifference / Math.max(effectiveStandardError, 1e-6);
   const desktopPooledPopulationVariance =
     (
-      ((sampleSize - 1) * variance(populations.male)) +
-      ((sampleSize - 1) * variance(populations.female))
+      ((sampleSize - 1) * sampleVariance(populations.male)) +
+      ((sampleSize - 1) * sampleVariance(populations.female))
     ) / Math.max(2 * sampleSize - 2, 1);
   const desktopStandardError = Math.sqrt(desktopPooledPopulationVariance * (2 / sampleSize));
   const desktopTValue = cardMeanDifference / Math.max(desktopStandardError, 1e-6);

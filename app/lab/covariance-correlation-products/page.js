@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { downloadCsv } from "../_shared/csv";
+import { covariance, mean, standardDeviation } from "../_shared/stats";
 
 const DATASETS = [
   {
@@ -31,26 +32,9 @@ const CRITICAL_T_BY_DF = {
 
 const PRODUCT_COLORS = ["#ef4444", "#2563eb", "#f59e0b", "#10b981", "#8b5cf6", "#ec4899", "#0ea5e9"];
 
-function mean(values) {
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
-}
-
-function sampleStd(values) {
-  if (values.length <= 1) return 0;
-  const average = mean(values);
-  const variance = values.reduce((sum, value) => sum + (value - average) ** 2, 0) / (values.length - 1);
-  return Math.sqrt(variance);
-}
-
-function covariance(x, y) {
-  const xMean = mean(x);
-  const yMean = mean(y);
-  return x.reduce((sum, value, index) => sum + (value - xMean) * (y[index] - yMean), 0) / (x.length - 1);
-}
-
 function correlation(x, y) {
-  const sx = sampleStd(x);
-  const sy = sampleStd(y);
+  const sx = standardDeviation(x);
+  const sy = standardDeviation(y);
   if (sx === 0 || sy === 0) return 0;
   return covariance(x, y) / (sx * sy);
 }
@@ -60,8 +44,8 @@ function calculateDatasetStats(dataset) {
   const yMean = mean(dataset.y);
   const centeredProducts = dataset.x.map((xValue, index) => (xValue - xMean) * (dataset.y[index] - yMean));
   const productSum = centeredProducts.reduce((sum, value) => sum + value, 0);
-  const sx = sampleStd(dataset.x);
-  const sy = sampleStd(dataset.y);
+  const sx = standardDeviation(dataset.x);
+  const sy = standardDeviation(dataset.y);
   const cov = covariance(dataset.x, dataset.y);
   const r = correlation(dataset.x, dataset.y);
   const tValue = tFromCorrelation(r, dataset.x.length);

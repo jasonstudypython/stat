@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useId, useMemo, useState } from "react";
 import { downloadCsv } from "../_shared/csv";
+import { createSeededRandom, mean, sampleNormal, standardDeviation } from "../_shared/stats";
 import { useMobileFitScale } from "../_shared/useMobileFitScale";
 
 const MOBILE_SCATTER_SECTIONS = [
@@ -52,32 +53,6 @@ const MOBILE_SCATTER_SECTIONS = [
     },
   },
 ];
-
-function createSeededRandom(seed) {
-  let state = seed >>> 0;
-  return function nextRandom() {
-    state = (1664525 * state + 1013904223) >>> 0;
-    return state / 4294967296;
-  };
-}
-
-function sampleNormal(random, mean = 0, std = 1) {
-  const u1 = Math.max(random(), 1e-12);
-  const u2 = random();
-  const z0 = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-  return mean + z0 * std;
-}
-
-function mean(values) {
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
-}
-
-function standardDeviation(values) {
-  const avg = mean(values);
-  const variance =
-    values.reduce((sum, value) => sum + (value - avg) ** 2, 0) / Math.max(values.length - 1, 1);
-  return Math.sqrt(variance);
-}
 
 function fitSimpleRegression(points) {
   const xMean = mean(points.map((point) => point.x));

@@ -2,7 +2,8 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createSeededRandom, linspace, mean, sampleNormal, standardDeviation } from "../_shared/stats";
 
 const Plot = dynamic(() => import("react-plotly.js"), {
   ssr: false,
@@ -16,39 +17,6 @@ const VIEW_OPTIONS = [
   { key: "poisson", label: "포아송" },
   { key: "exponential", label: "지수" },
 ];
-
-function createSeededRandom(seed) {
-  let state = seed >>> 0;
-  return function nextRandom() {
-    state = (1664525 * state + 1013904223) >>> 0;
-    return state / 4294967296;
-  };
-}
-
-function sampleNormal(random, mean = 0, std = 1) {
-  const u1 = Math.max(random(), 1e-12);
-  const u2 = random();
-  const z0 = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-  return mean + z0 * std;
-}
-
-function linspace(start, end, count) {
-  if (count <= 1) return [start];
-  const step = (end - start) / (count - 1);
-  return Array.from({ length: count }, (_, index) => start + step * index);
-}
-
-function mean(values) {
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
-}
-
-function standardDeviation(values) {
-  if (values.length <= 1) return 0;
-  const avg = mean(values);
-  const variance =
-    values.reduce((sum, value) => sum + (value - avg) ** 2, 0) / Math.max(values.length - 1, 1);
-  return Math.sqrt(variance);
-}
 
 function sigmoid(value) {
   return 1 / (1 + Math.exp(-value));
@@ -947,7 +915,6 @@ export default function BasicStatsRegressionPage() {
     Object.fromEntries(VIEW_OPTIONS.map((option) => [option.key, 0.5])),
   );
   const plotRevision = useRef(0);
-  const deferredProgressValue = useDeferredValue(progressValue);
 
   useEffect(() => {
     const updateViewport = () => setIsMobileViewport(window.innerWidth <= 820);
@@ -957,25 +924,31 @@ export default function BasicStatsRegressionPage() {
   }, []);
 
   const activeScene = scenes[viewKey];
-  const immediateProgress = progressValue / 100;
-  const progress = deferredProgressValue / 100;
-  const basePlot =
-    viewKey === "logistic" ? activeScene.plot(progress, logisticApplied) : activeScene.plot(progress);
   const visibilityForView = traceVisibility[viewKey] || {};
-  const plot = {
-    ...basePlot,
-    data: basePlot.data.map((trace, index) => {
-      const nextVisible = visibilityForView[index];
-      return {
-        ...trace,
-        visible: nextVisible ?? trace.visible,
-      };
-    }),
-  };
-  const immediatePoint =
-    viewKey === "logistic"
-      ? activeScene.pointAt(immediateProgress, logisticApplied)
-      : activeScene.pointAt(immediateProgress);
+  const progress = progressValue / 100;
+  const plot = useMemo(() => {
+    const basePlot =
+      viewKey === "logistic" ? activeScene.plot(progress, logisticApplied) : activeScene.plot(progress);
+    const nextPlot = {
+      ...basePlot,
+      data: basePlot.data.map((trace, index) => {
+        const nextVisible = visibilityForView[index];
+        return {
+          ...trace,
+          visible: nextVisible ?? trace.visible,
+        };
+      }),
+    };
+
+    return nextPlot;
+  }, [activeScene, logisticApplied, progress, viewKey, visibilityForView]);
+  const immediatePoint = useMemo(
+    () =>
+      viewKey === "logistic"
+        ? activeScene.pointAt(progress, logisticApplied)
+        : activeScene.pointAt(progress),
+    [activeScene, logisticApplied, progress, viewKey],
+  );
   const currentPoint =
     viewKey === "multiple" && hoveredPrediction ? hoveredPrediction : immediatePoint;
 
@@ -1013,12 +986,29 @@ export default function BasicStatsRegressionPage() {
       }),
     [scenes],
   );
+  const mobileSectionStates = useMemo(
+    () =>
+      mobileSections.map((section) => {
+        const scene = scenes[section.key];
+        const sliderValue = mobileSliderValues[section.key] ?? 0.5;
+        const plot = section.key === "logistic" ? scene.plot(sliderValue, true) : scene.plot(sliderValue);
+        const point =
+          section.key === "logistic" ? scene.pointAt(sliderValue, true) : scene.pointAt(sliderValue);
+        return {
+          ...section,
+          sliderValue,
+          plot,
+          point,
+        };
+      }),
+    [mobileSections, mobileSliderValues, scenes],
+  );
 
   if (isMobileViewport) {
     return (
       <main className="rr-shell regswitch-shell basicreg-shell">
         <div className="regswitch-mobile-stack">
-          {mobileSections.map((section) => (
+          {mobileSectionStates.map((section) => (
             <section key={section.key} className="regswitch-mobile-section">
               <div className="regswitch-mobile-head">
                 <p className="panel-label">Graph</p>
@@ -1026,92 +1016,85 @@ export default function BasicStatsRegressionPage() {
                 <p className="regswitch-formula">{section.formula}</p>
               </div>
 
-              {(() => {
-                const scene = scenes[section.key];
-                const sliderValue = mobileSliderValues[section.key] ?? 0.5;
-                const sectionPlot =
-                  section.key === "logistic"
-                    ? scene.plot(sliderValue, true)
-                    : scene.plot(sliderValue);
-                const sectionPoint =
-                  section.key === "logistic"
-                    ? scene.pointAt(sliderValue, true)
-                    : scene.pointAt(sliderValue);
+              <>
+                <div
+                  className={`regswitch-plot-wrap ${
+                    section.dimension === "subplot" ? "is-subplot" : ""
+                  }`}
+                >
+                  <Plot
+                    data={section.plot.data.map((trace) => ({
+                      ...trace,
+                      visible: trace.visible === false ? false : true,
+                    }))}
+                    layout={{
+                      paper_bgcolor: "rgba(0,0,0,0)",
+                      plot_bgcolor: "rgba(0,0,0,0)",
+                      margin: { l: 56, r: 18, t: 24, b: 68 },
+                      autosize: true,
+                      font: {
+                        family: "Pretendard, Noto Sans KR, sans-serif",
+                        color: "#112d4e",
+                        size: 14,
+                      },
+                      legend: {
+                        orientation: "h",
+                        yanchor: "bottom",
+                        y: 1.02,
+                        xanchor: "left",
+                        x: 0,
+                      },
+                      uirevision: `${section.key}-mobile`,
+                      ...section.plot.layout,
+                    }}
+                    config={{
+                      responsive: true,
+                      showTips: true,
+                      doubleClick: "reset+autosize",
+                      displaylogo: false,
+                      modeBarButtonsToRemove: ["lasso2d", "select2d"],
+                    }}
+                    style={{ width: "100%", height: "100%" }}
+                  />
+                </div>
 
-                return (
-                  <>
-                    <div
-                      className={`regswitch-plot-wrap ${
-                        section.dimension === "subplot" ? "is-subplot" : ""
-                      }`}
-                    >
-                      <Plot
-                        data={sectionPlot.data.map((trace) => ({
-                          ...trace,
-                          visible: trace.visible === false ? false : true,
-                        }))}
-                        layout={{
-                          paper_bgcolor: "rgba(0,0,0,0)",
-                          plot_bgcolor: "rgba(0,0,0,0)",
-                          margin: { l: 56, r: 18, t: 24, b: 68 },
-                          autosize: true,
-                          font: {
-                            family: "Pretendard, Noto Sans KR, sans-serif",
-                            color: "#112d4e",
-                            size: 14,
-                          },
-                          legend: {
-                            orientation: "h",
-                            yanchor: "bottom",
-                            y: 1.02,
-                            xanchor: "left",
-                            x: 0,
-                          },
-                          uirevision: `${section.key}-mobile`,
-                          ...sectionPlot.layout,
-                        }}
-                        config={{
-                          responsive: true,
-                          showTips: true,
-                          doubleClick: "reset+autosize",
-                          displaylogo: false,
-                          modeBarButtonsToRemove: ["lasso2d", "select2d"],
-                        }}
-                        style={{ width: "100%", height: "100%" }}
-                      />
-                    </div>
+                <section className="regswitch-slider-card regswitch-mobile-slider">
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value={section.sliderValue}
+                    onInput={(event) => {
+                      const nextValue = Number(event.target.value);
+                      setMobileSliderValues((current) => ({
+                        ...current,
+                        [section.key]: nextValue,
+                      }));
+                    }}
+                    onChange={(event) => {
+                      const nextValue = Number(event.target.value);
+                      setMobileSliderValues((current) => ({
+                        ...current,
+                        [section.key]: nextValue,
+                      }));
+                    }}
+                    aria-label={`${section.title} ${section.sliderLabel}`}
+                  />
+                </section>
 
-                    <section className="regswitch-slider-card regswitch-mobile-slider">
-                      <input
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.01"
-                        value={sliderValue}
-                        onChange={(event) =>
-                          setMobileSliderValues((current) => ({
-                            ...current,
-                            [section.key]: Number(event.target.value),
-                          }))
-                        }
-                        aria-label={`${section.title} ${section.sliderLabel}`}
-                      />
-                    </section>
-
-                    <section className="regswitch-slider-card regswitch-mobile-summary">
-                      <div className="regswitch-value-grid">
-                        {sectionPoint.cards.map((item) => (
-                          <div key={`${section.key}-${item.label}`}>
-                            <small>{item.label}</small>
-                            <strong>{item.value}</strong>
-                          </div>
-                        ))}
+                <section className="regswitch-slider-card regswitch-mobile-summary">
+                  <div className="regswitch-value-grid">
+                    {section.point.cards.map((item) => (
+                      <div key={`${section.key}-${item.label}`}>
+                        <small>{item.label}</small>
+                        <strong>{item.value}</strong>
                       </div>
-                      <p className="regswitch-equation-value">{sectionPoint.equationValue}</p>
-                    </section>
-                  </>
-                );
-              })()}
+                    ))}
+                  </div>
+                  <p className="regswitch-equation-value">{section.point.equationValue}</p>
+                </section>
+              </>
             </section>
           ))}
         </div>

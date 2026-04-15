@@ -2,11 +2,34 @@
   --bg: #f9f7f7;
   --surface: #ffffff;
   --surface-soft: #f1f5f9;
+  --font-ui: "Pretendard", "Noto Sans KR", "Apple SD Gothic Neo", sans-serif;
   --text: #112d4e;
   --muted: #5e738f;
   --primary: #3f72af;
   --line: rgba(17, 45, 78, 0.12);
   --shadow: 0 18px 40px rgba(17, 45, 78, 0.08);
+  --home-hero-line-start: #8aaedb;
+  --home-hero-line-end: #f07b54;
+  --home-visual-axis: #17355d;
+  --home-visual-accent: #ff7b7b;
+  --home-visual-surface: #ffffff;
+  --home-visual-dot-stroke: #3f72af;
+  --home-card-blue-start: #dce7f8;
+  --home-card-blue-end: #8cb0df;
+  --home-card-green-start: #e3f7ea;
+  --home-card-green-end: #99d9b3;
+  --home-card-green-soft: #d9f1e3;
+  --home-card-green-mid: #66bb8a;
+  --home-card-green-strong: #2a9d62;
+  --home-card-green-text: #195338;
+  --home-card-peach-start: #fde8df;
+  --home-card-peach-end: #f4b79d;
+  --home-card-peach-strong: #8a3f25;
+  --home-card-peach-text: #6f2d17;
+}
+
+input[type="range"] {
+  accent-color: #ef4444;
 }
 
 @media (max-width: 820px) {
@@ -536,7 +559,7 @@ body {
     radial-gradient(circle at top left, rgba(63, 114, 175, 0.12), transparent 26%),
     linear-gradient(180deg, #fcfbfb 0%, var(--bg) 100%);
   color: var(--text);
-  font-family: "Pretendard", "Noto Sans KR", "Apple SD Gothic Neo", sans-serif;
+  font-family: var(--font-ui);
 }
 
 a {
@@ -1352,7 +1375,7 @@ a {
 
 .lab-slider-wrap input[type="range"] {
   width: 100%;
-  accent-color: #8ec5ff;
+  accent-color: #ef4444;
 }
 
 .lab-compact-stats {
@@ -1512,7 +1535,7 @@ a {
 
 .reg3d-slider input[type="range"] {
   width: 100%;
-  accent-color: #8ec5ff;
+  accent-color: #ef4444;
 }
 
 .reg3d-stats {
@@ -2208,7 +2231,7 @@ a {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  min-height: 250px;
+  min-height: 210px;
   padding: 24px 24px 22px;
   border-radius: 30px;
   border: 1px solid rgba(17, 45, 78, 0.06);
@@ -2239,10 +2262,6 @@ a {
   box-shadow:
     inset 4px 4px 8px rgba(167, 176, 190, 0.6),
     inset -2px -2px 4px rgba(255, 255, 255, 0.16);
-}
-
-.lab-index-card-glow {
-  display: none;
 }
 
 .lab-index-card-top,
@@ -2283,12 +2302,6 @@ a {
   font-size: 1.72rem;
   line-height: 1.12;
   letter-spacing: -0.04em;
-}
-
-.lab-index-card p:not(.eyebrow) {
-  margin: 0;
-  color: var(--muted);
-  line-height: 1.72;
 }
 
 .lab-index-card-footer {
@@ -2360,26 +2373,6 @@ a {
   box-shadow:
     inset 4px 4px 8px rgba(167, 176, 190, 0.6),
     inset -2px -2px 4px rgba(255, 255, 255, 0.14);
-}
-
-.lab-index-card.is-blue {
-  border-color: rgba(17, 45, 78, 0.08);
-}
-
-.lab-index-card.is-coral {
-  border-color: rgba(17, 45, 78, 0.08);
-}
-
-.lab-index-card.is-sky {
-  border-color: rgba(17, 45, 78, 0.08);
-}
-
-.lab-index-card.is-amber {
-  border-color: rgba(17, 45, 78, 0.08);
-}
-
-.lab-index-card.is-lilac {
-  border-color: rgba(17, 45, 78, 0.08);
 }
 
 .scatter-bridge-plot-wrap {
@@ -2775,7 +2768,7 @@ a {
 }
 
 .regswitch-toggle-list input {
-  accent-color: var(--primary);
+  accent-color: #ef4444;
 }
 
 .regswitch-toggle-list strong {
@@ -2952,7 +2945,7 @@ a {
 }
 
 .heightdist-inline-check input {
-  accent-color: var(--primary);
+  accent-color: #ef4444;
 }
 
 .heightdist-inline-check strong {
@@ -4380,6 +4373,7 @@ a {
 
 .reg1intro-slider {
   width: 100%;
+  accent-color: #ef4444;
 }
 
 .reg1intro-slider-meta {
@@ -4986,6 +4980,11 @@ a {
   width: 100%;
   height: auto;
   display: block;
+}
+
+.home-link-visual-text {
+  font-family: var(--font-ui);
+  letter-spacing: -0.02em;
 }
 
 .home-link-card:hover .home-link-card-frame {
@@ -6311,6 +6310,24 @@ a {
     min-width: 122px;
     min-height: 82px;
     padding: 12px 14px;
+  }
+
+  .modlab-mobile-cards .modlab-expression-note {
+    top: 10px;
+    left: 12px;
+    transform: none;
+    font-size: 0.82rem;
+    min-width: 0;
+    max-width: calc(100% - 24px);
+    white-space: normal;
+    text-align: left;
+    line-height: 1.25;
+    padding: 0;
+  }
+
+  .modlab-mobile-cards .modlab-expression-card:has(.modlab-expression-note) {
+    align-content: end;
+    padding-top: 34px;
   }
 
   .modlab-mobile-cards .modlab-expression-card p {

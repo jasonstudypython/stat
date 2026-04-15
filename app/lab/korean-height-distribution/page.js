@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import rawHeightData from "../../../data_mdis_height.json";
 import { downloadCsv } from "../_shared/csv";
+import { mean, normalCdf, standardDeviation } from "../_shared/stats";
 
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
 
@@ -26,17 +27,6 @@ const GROUPS = {
     fill99: "rgba(59,130,246,0.54)",
   },
 };
-
-function mean(values) {
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
-}
-
-function standardDeviation(values) {
-  const avg = mean(values);
-  const variance =
-    values.reduce((sum, value) => sum + (value - avg) ** 2, 0) / Math.max(values.length - 1, 1);
-  return Math.sqrt(variance);
-}
 
 function median(values) {
   const sorted = [...values].sort((a, b) => a - b);
@@ -72,27 +62,6 @@ function normalPdf(x, avg, std) {
   const safeStd = std || 1;
   const z = (x - avg) / safeStd;
   return Math.exp(-0.5 * z ** 2) / (safeStd * Math.sqrt(2 * Math.PI));
-}
-
-function erf(x) {
-  const sign = x < 0 ? -1 : 1;
-  const absX = Math.abs(x);
-  const a1 = 0.254829592;
-  const a2 = -0.284496736;
-  const a3 = 1.421413741;
-  const a4 = -1.453152027;
-  const a5 = 1.061405429;
-  const p = 0.3275911;
-  const t = 1 / (1 + p * absX);
-  const y =
-    1 -
-    (((((a5 * t + a4) * t + a3) * t + a2) * t + a1) * t) *
-      Math.exp(-absX * absX);
-  return sign * y;
-}
-
-function normalCdf(z) {
-  return 0.5 * (1 + erf(z / Math.sqrt(2)));
 }
 
 function kernelDensity(values, points, bandwidth) {
@@ -439,16 +408,12 @@ export default function KoreanHeightDistributionPage() {
       }
     }
 
-    const intervalRows = [];
-    if (showStdBand) intervalRows.push({ label: "±1 표준편차", multiplier: 1, baseY: 0.035 });
-    if (show95) intervalRows.push({ label: "95% 신뢰구간", z: 1.96, baseY: intervalRows.length ? 0.085 : 0.035 });
-    if (show99) {
-      intervalRows.push({
-        label: "99% 신뢰구간",
-        z: 2.576,
-        baseY: intervalRows.length ? 0.135 : 0.035,
-      });
-    }
+    const intervalRows = [
+      showStdBand ? { label: "±1 표준편차", multiplier: 1 } : null,
+      show95 ? { label: "95% 신뢰구간", z: 1.96 } : null,
+      show99 ? { label: "99% 신뢰구간", z: 2.576 } : null,
+    ].filter(Boolean);
+    const intervalTopY = 0.035 + Math.max(intervalRows.length - 1, 0) * 0.05;
 
     activeKeys.forEach((key, groupIndex) => {
       const meta = GROUPS[key];
@@ -458,7 +423,7 @@ export default function KoreanHeightDistributionPage() {
         const distance = (interval.multiplier || interval.z) * current.std;
         const low = current.mean - distance;
         const high = current.mean + distance;
-        const y = interval.baseY + groupIndex * 0.032 + intervalIndex * 0.01;
+        const y = intervalTopY - intervalIndex * 0.05 + groupIndex * 0.032;
 
         annotations.push({
           x: high,
