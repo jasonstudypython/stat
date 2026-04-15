@@ -1232,7 +1232,7 @@ export default function Regression1OlsIntroPage() {
       <header className="rr-header reg1intro-header">
         <div>
           <p className="eyebrow">GRAPH</p>
-          <h1>OLS와 최소제곱법</h1>
+          <h1>최소제곱법과 회귀모형</h1>
         </div>
         <div className="lab-header-action-stack">
           <Link className="secondary-button regswitch-home-button" href="/lab">

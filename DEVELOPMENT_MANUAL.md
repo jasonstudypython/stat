@@ -107,7 +107,6 @@ Basic deploy flow:
 - [app/lab/rotating-regression/page.js](D:/project/lecture/app/lab/rotating-regression/page.js)
 - [app/lab/sample-mean-distribution/page.js](D:/project/lecture/app/lab/sample-mean-distribution/page.js)
 - [app/lab/t-f-analysis/page.js](D:/project/lecture/app/lab/t-f-analysis/page.js)
-- [app/lab/workbench/page.js](D:/project/lecture/app/lab/workbench/page.js)
 
 ### Supporting scripts
 
@@ -118,7 +117,7 @@ Basic deploy flow:
 
 - [app/lab/_shared/stats.js](D:/project/lecture/app/lab/_shared/stats.js)
   - shared pure math / stats helpers used by newer lab pages
-  - includes seeded random, normal sampling, matrix solving, formatting helpers
+  - includes seeded random, normal sampling, `linspace`, mean / variance / standard deviation, covariance, matrix solving, normal CDF, and formatting helpers
 - [app/lab/_shared/csv.js](D:/project/lecture/app/lab/_shared/csv.js)
   - shared browser CSV download helper
   - current convention is to export jamovi-friendly CSV columns
@@ -144,6 +143,7 @@ Characteristics:
 - imports `react-plotly.js` with `dynamic(..., { ssr: false })`
 - uses one large scene builder
 - stores view mode, slider state, legend visibility in React state
+- slider-heavy Plotly pages may require extra care around `Plot` rerenders; prefer memoizing derived `plot` / `point` objects when tuning interaction performance
 
 ### B. Custom SVG pages
 
@@ -243,6 +243,11 @@ Recommended approach:
 2. edit only that block
 3. avoid broad changes to shared generic selectors unless necessary
 
+Additional current conventions:
+- landing page `/` uses shared color and font tokens from `:root` for SVG visuals
+- `/lab` index cards currently render title-only cards
+- unused accent variants for `/lab` cards have been removed; do not assume per-card accent classes exist
+
 ## 9. Maintenance Rules
 
 This project has a strict Korean-safety workflow.
@@ -278,6 +283,11 @@ Recommended steps:
    - [app/globals.css](D:/project/lecture/app/globals.css)
 3. Add a card in:
    - [app/lab/page.js](D:/project/lecture/app/lab/page.js)
+   - current `/lab` cards use:
+     - `href`
+     - `eyebrow`
+     - `title`
+   - descriptions are not currently rendered in the index UI
 4. Run:
    - `npm run check:korean`
    - `npm run build`
@@ -301,7 +311,8 @@ If the page has downloadable source data:
   - shared pure utilities are fine, but page choreography should stay local
 - Minimal shared utility refactoring has already been done.
   - prefer reusing [app/lab/_shared/stats.js](D:/project/lecture/app/lab/_shared/stats.js)
-  - avoid duplicating new seeded-random or matrix helpers
+  - avoid duplicating new seeded-random, distribution, covariance, or matrix helpers
+- `/lab/page.js` is currently a server component and should stay static unless client state is actually needed
 - Some pages intentionally use page-specific CSS overrides in `app/globals.css`.
   - examples:
     - `t-f-analysis`: compressed t-axis / distribution display tuning
@@ -372,6 +383,9 @@ Typical behavior:
 - `rotating-regression`
   - mobile keeps live slider interaction
   - order is `graphs -> slider -> metric cards`
+- `basic-stats-1-regressions`
+  - desktop and mobile slider paths were tuned to reduce interaction stalls
+  - avoid reintroducing deferred slider state unless there is a measured need
 - `sample-mean-distribution`
   - top controls are compacted into a shallow 2-column control block
   - run button is integrated next to the slider on mobile
@@ -428,8 +442,9 @@ npm.cmd run build
 - `gender-moderation-effect` extends the same shell but uses `modlab-*` cards and stage-specific formula blocks
 - moderation pages may have stage-specific graph titles, formula cards, and plot mode toggles, so text should be checked per stage rather than per page only
 - if jamovi comparison is needed, use the CSV export file in `exports/` instead of regenerating ad hoc data
-- duplicated seeded-random / matrix helper functions currently exist across several new pages; if future maintenance touches them together, consider extracting a shared utility module after verifying all lecture numbers still match
+- several common math helpers have already been consolidated into [app/lab/_shared/stats.js](D:/project/lecture/app/lab/_shared/stats.js); continue that direction before adding new local copies
 - `regression-3d` route has been removed and should not be reintroduced unless it is added back to the `/lab` index intentionally
+- `workbench` route has been removed and should not be referenced in navigation or maintenance checklists unless restored intentionally
 
 ## 12. Practical Maintenance Checklist
 
