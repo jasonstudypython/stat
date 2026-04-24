@@ -230,7 +230,7 @@ export default function HomePage() {
           <JamoviCardVisual />
         </LinkCard>
         <LinkCard
-          href="https://www.processmacro.org/download.html"
+          href="https://haskayne.ucalgary.ca/CCRAM/resource-hub"
           title="PROCESS Macro"
           description="매개·조절 효과 분석용 확장 도구"
           external
