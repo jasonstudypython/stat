@@ -26,3 +26,8 @@ tmp_pptx_stats2/
 *.zip
 *.pptx
 ppt_batch/*_extracted/
+
+# Local survey/reference data (do not publish)
+*.sav
+교육만족도 - 복사본.pdf
+-Context
