@@ -208,7 +208,7 @@ export default function HomePage() {
     <main className="home-shell">
       <section className="home-hero">
         <div className="home-hero-copy">
-          <p className="eyebrow">HANYANG UNIVERSITY · 2026-1</p>
+          <p className="eyebrow">HANYANG UNIVERSITY</p>
           <h1>조직연구방법론</h1>
           <p className="home-hero-text">통계분석 수업을 위한 보조자료</p>
         </div>
