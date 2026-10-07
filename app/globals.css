@@ -3454,8 +3454,8 @@ a {
 }
 
 .samplingtest-bar {
-  fill: rgba(99, 102, 241, 0.28);
-  stroke: #3f72af;
+  fill: rgba(248, 118, 104, 0.42);
+  stroke: #e5675b;
   stroke-width: 0.8;
 }
 
@@ -3468,9 +3468,9 @@ a {
 
 .samplingtest-selected-dot,
 .samplingtest-sample-dot {
-  fill: #fff;
-  stroke: #ff6a1b;
-  stroke-width: 3;
+  fill: #ef4444;
+  stroke: rgba(255, 255, 255, 0.94);
+  stroke-width: 2.5;
 }
 
 .samplingtest-rejection {
@@ -3500,8 +3500,9 @@ a {
 }
 
 .samplingtest-stat-line {
-  stroke: #ff6a1b;
-  stroke-width: 3;
+  stroke: #7c3aed;
+  stroke-width: 4;
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.95));
 }
 
 .samplingtest-stat-line.is-rejected {
@@ -3510,7 +3511,7 @@ a {
 }
 
 .samplingtest-stat-label {
-  fill: #d85818;
+  fill: #6d28d9;
   font-size: 16px;
   font-weight: 900;
 }

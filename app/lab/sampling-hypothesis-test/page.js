@@ -8,8 +8,9 @@ import { createSeededRandom, mean, standardDeviation } from "../_shared/stats";
 const SAMPLE_SIZES = [3, 30, 300];
 const MAX_ROUNDS = 320;
 const T_CRITICAL = { 3: 4.303, 30: 2.045, 300: 1.968 };
+const NULL_MEAN = 160.56;
 const POPULATION_RANGE = [125, 205];
-const DISTRIBUTION_RANGE = [-15, 15];
+const DISTRIBUTION_RANGE = [-25, 10];
 
 function populationStandardDeviation(values, center) {
   return Math.sqrt(values.reduce((sum, value) => sum + (value - center) ** 2, 0) / values.length);
@@ -95,7 +96,7 @@ function PopulationHistogram({ population, currentRound, populationMean }) {
   currentRound?.values.forEach((value) => highlighted.set(value, (highlighted.get(value) || 0) + 1));
 
   return (
-    <svg className="samplingtest-plot" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="대한민국 성인 여성 키 모집단 히스토그램">
+    <svg className="samplingtest-plot" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="대한민국 성인 남성 키 모집단 히스토그램">
       {[0.25, 0.5, 0.75].map((ratio) => (
         <line key={ratio} x1="52" x2="736" y1={top + ratio * (bottom - top)} y2={top + ratio * (bottom - top)} className="samplingtest-grid" />
       ))}
@@ -125,7 +126,7 @@ function PopulationHistogram({ population, currentRound, populationMean }) {
   );
 }
 
-function DistributionPlot({ visibleRounds, currentRound, sampleSize, mode, populationMean, populationStd }) {
+function DistributionPlot({ visibleRounds, currentRound, sampleSize, mode, nullMean, nullPopulationStd }) {
   const width = 760;
   const height = 470;
   const top = 50;
@@ -133,13 +134,13 @@ function DistributionPlot({ visibleRounds, currentRound, sampleSize, mode, popul
   const df = sampleSize - 1;
   const critical = mode === "t" ? T_CRITICAL[sampleSize] : 1.96;
   const currentSe = currentRound
-    ? (mode === "t" ? currentRound.std : populationStd) / Math.sqrt(sampleSize)
-    : populationStd / Math.sqrt(sampleSize);
+    ? (mode === "t" ? currentRound.std : nullPopulationStd) / Math.sqrt(sampleSize)
+    : nullPopulationStd / Math.sqrt(sampleSize);
   const leftCritical = -critical * currentSe;
   const rightCritical = critical * currentSe;
   const curvePoints = Array.from({ length: 201 }, (_, index) => DISTRIBUTION_RANGE[0] + index * (DISTRIBUTION_RANGE[1] - DISTRIBUTION_RANGE[0]) / 200);
   const curvePath = (round) => {
-    const standardError = Math.max((mode === "t" ? round.std : populationStd) / Math.sqrt(sampleSize), 0.08);
+    const standardError = Math.max((mode === "t" ? round.std : nullPopulationStd) / Math.sqrt(sampleSize), 0.08);
     const peak = mode === "t" ? tPdf(0, df) : normalPdf(0);
     return curvePoints.map((difference, index) => {
       const scaledStatistic = difference / standardError;
@@ -149,14 +150,18 @@ function DistributionPlot({ visibleRounds, currentRound, sampleSize, mode, popul
     }).join(" ");
   };
   const criticalBoundsFor = (round) => {
-    const standardError = Math.max((mode === "t" ? round.std : populationStd) / Math.sqrt(sampleSize), 0.08);
+    const standardError = Math.max((mode === "t" ? round.std : nullPopulationStd) / Math.sqrt(sampleSize), 0.08);
     return critical * standardError;
   };
-  const fallbackRound = { std: populationStd };
+  const fallbackRound = { std: nullPopulationStd };
   const activeRound = currentRound || fallbackRound;
-  const currentDifference = currentRound ? populationMean - currentRound.mean : null;
+  const currentDifference = currentRound ? nullMean - currentRound.mean : null;
   const currentStatistic = currentDifference === null ? null : currentDifference / Math.max(currentSe, 1e-6);
   const rejected = currentStatistic !== null && Math.abs(currentStatistic) >= critical;
+  const displayedDifference = currentDifference === null
+    ? null
+    : Math.max(DISTRIBUTION_RANGE[0], Math.min(DISTRIBUTION_RANGE[1], currentDifference));
+  const isOutsideRange = currentDifference !== null && displayedDifference !== currentDifference;
 
   return (
     <svg className="samplingtest-plot" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`${mode === "t" ? "t" : "z"} 표집분포 누적 그래프`}>
@@ -193,11 +198,18 @@ function DistributionPlot({ visibleRounds, currentRound, sampleSize, mode, popul
       <line x1={xPosition(0, width)} x2={xPosition(0, width)} y1={top} y2={bottom} className="samplingtest-null-line" />
       {currentRound ? (
         <>
-          <line x1={xPosition(currentDifference, width)} x2={xPosition(currentDifference, width)} y1={top} y2={bottom} className={`samplingtest-stat-line${rejected ? " is-rejected" : ""}`} />
-          <text x={xPosition(currentDifference, width)} y="38" textAnchor="middle" className={`samplingtest-stat-label${rejected ? " is-rejected" : ""}`}>μ₀−x̄={currentDifference.toFixed(2)}</text>
+          <line x1={xPosition(displayedDifference, width)} x2={xPosition(displayedDifference, width)} y1={top} y2={bottom} className={`samplingtest-stat-line${rejected ? " is-rejected" : ""}`} />
+          <text
+            x={xPosition(displayedDifference, width)}
+            y="38"
+            textAnchor={isOutsideRange ? (currentDifference < 0 ? "start" : "end") : "middle"}
+            className={`samplingtest-stat-label${rejected ? " is-rejected" : ""}`}
+          >
+            {`${currentDifference < DISTRIBUTION_RANGE[0] ? "← " : currentDifference > DISTRIBUTION_RANGE[1] ? "→ " : ""}μ₀−x̄=${currentDifference.toFixed(2)}`}
+          </text>
         </>
       ) : null}
-      <text x="394" y="456" textAnchor="middle" className="samplingtest-axis-label">모집단평균 − 표본평균 (cm)</text>
+      <text x="394" y="456" textAnchor="middle" className="samplingtest-axis-label">여성 평균 160.56 − 표본평균 (cm)</text>
     </svg>
   );
 }
@@ -244,17 +256,25 @@ export default function SamplingHypothesisTestPage() {
   const [isPlaying, setIsPlaying] = useState(false);
 
   const population = useMemo(
+    () => rawHeightData.filter((row) => row.sex === "남").map((row) => Number(row.height)).filter(Number.isFinite),
+    [],
+  );
+  const nullPopulation = useMemo(
     () => rawHeightData.filter((row) => row.sex === "여").map((row) => Number(row.height)).filter(Number.isFinite),
     [],
   );
   const populationMean = useMemo(() => mean(population), [population]);
   const populationStd = useMemo(() => populationStandardDeviation(population, populationMean), [population, populationMean]);
+  const nullPopulationStd = useMemo(
+    () => populationStandardDeviation(nullPopulation, mean(nullPopulation)),
+    [nullPopulation],
+  );
   const rounds = useMemo(() => createRounds(population, sampleSize), [population, sampleSize]);
   const visibleRounds = rounds.slice(0, step);
   const currentRound = step > 0 ? rounds[step - 1] : null;
   const critical = mode === "t" ? T_CRITICAL[sampleSize] : 1.96;
-  const currentSe = currentRound ? (mode === "t" ? currentRound.std : populationStd) / Math.sqrt(sampleSize) : null;
-  const statistic = currentRound ? (populationMean - currentRound.mean) / Math.max(currentSe, 1e-6) : null;
+  const currentSe = currentRound ? (mode === "t" ? currentRound.std : nullPopulationStd) / Math.sqrt(sampleSize) : null;
+  const statistic = currentRound ? (NULL_MEAN - currentRound.mean) / Math.max(currentSe, 1e-6) : null;
   const rejected = statistic !== null && Math.abs(statistic) >= critical;
 
   useEffect(() => {
@@ -280,7 +300,7 @@ export default function SamplingHypothesisTestPage() {
         <div>
           <p className="eyebrow">Basic Statistics</p>
           <h1>표집분포와 가설검정</h1>
-          <p className="regswitch-formula">작은 표본의 불확실성과 t · z 분포 비교</p>
+          <p className="regswitch-formula">H₀: 여성 평균과 표본 모집단 평균의 차이는 0이다 · μ여성 − μ표본모집단 = 0</p>
         </div>
         <Link className="secondary-button regswitch-home-button" href="/lab">메인으로</Link>
       </header>
@@ -315,17 +335,17 @@ export default function SamplingHypothesisTestPage() {
       <section className="samplingtest-grid-layout">
         <article className="samplingtest-card">
           <div className="samplingtest-card-head">
-            <h2>대한민국 성인 여성의 키</h2>
-            <p>가상 모집단 N={population.length.toLocaleString()} · μ={populationMean.toFixed(2)} · σ={populationStd.toFixed(2)}</p>
+            <h2>대한민국 성인 남성의 키</h2>
+            <p>표집 대상 N={population.length.toLocaleString()} · 평균 {populationMean.toFixed(2)} · 표준편차 {populationStd.toFixed(2)}</p>
           </div>
           <PopulationHistogram population={population} currentRound={currentRound} populationMean={populationMean} />
         </article>
         <article className="samplingtest-card">
           <div className="samplingtest-card-head">
             <h2>영가설 분포</h2>
-            <p>{mode === "t" ? "각 표본의 s에 따른 t 곡선과 기각 경계 · 최대 320회 누적" : "모집단 σ로 계산한 고정 z 곡선과 기각 경계"}</p>
+            <p>{mode === "t" ? "H₀: μ여성 − μ표본모집단 = 0 · 표본 s 사용" : `H₀: μ여성 − μ표본모집단 = 0 · 여성 모집단 σ=${nullPopulationStd.toFixed(2)} 사용`}</p>
           </div>
-          <DistributionPlot visibleRounds={visibleRounds} currentRound={currentRound} sampleSize={sampleSize} mode={mode} populationMean={populationMean} populationStd={populationStd} />
+          <DistributionPlot visibleRounds={visibleRounds} currentRound={currentRound} sampleSize={sampleSize} mode={mode} nullMean={NULL_MEAN} nullPopulationStd={nullPopulationStd} />
           <div className="samplingtest-result-row">
             <span>유의수준 α=.05 · 양측 기각역 ±{critical.toFixed(3)}</span>
             <strong className={rejected ? "is-rejected" : ""}>{statistic === null ? "표본을 뽑아 보세요" : `${mode}=${statistic.toFixed(2)} · ${rejected ? "H₀ 기각" : "H₀ 기각하지 못함"}`}</strong>
