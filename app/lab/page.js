@@ -7,6 +7,7 @@ const LAB_PAGES = [
   { href: "/lab/korean-height-distribution", eyebrow: "BASIC STATISTICS", title: "확률 분포" },
   { href: "/lab/sample-mean-distribution", eyebrow: "BASIC STATISTICS", title: "표본평균의 분포" },
   { href: "/lab/sampling-hypothesis-test", eyebrow: "BASIC STATISTICS", title: "표집분포와 가설검정" },
+  { href: "/lab/galton-board", eyebrow: "BASIC STATISTICS", title: "갈톤보드 시뮬레이터" },
   { href: "/lab/t-f-analysis", eyebrow: "BASIC STATISTICS", title: "t검정과 F검정" },
   { href: "/lab/mean-difference-distribution", eyebrow: "BASIC STATISTICS", title: "영가설 분포" },
   { href: "/lab/covariance-correlation-products", eyebrow: "REGRESSION", title: "공분산과 상관계수" },
@@ -16,7 +17,7 @@ const LAB_PAGES = [
   { href: "/lab/gender-moderation-effect", eyebrow: "REGRESSION", title: "조절효과" },
 ];
 
-const ORDERED_PAGES = [1, 0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((index) => LAB_PAGES[index]);
+const ORDERED_PAGES = [1, 0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13].map((index) => LAB_PAGES[index]);
 
 function ArrowIcon() {
   return (
