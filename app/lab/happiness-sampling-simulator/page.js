@@ -64,7 +64,9 @@ function makeKnownPopulation() {
 
 function makeVirtualPopulation(center, spread) {
   const random = createSeededRandom(20261104 + Math.round(center * 100) + Math.round(spread * 1000));
-  return Array.from({ length: 12000 }, () => clamp(sampleNormal(random, center, spread), 0, 10));
+  const values = Array.from({ length: 12000 }, () => sampleNormal(random, center, spread));
+  const generatedMean = mean(values);
+  return values.map((value) => value + center - generatedMean);
 }
 
 function makeRounds(population, sampleSize, seed) {
@@ -106,11 +108,13 @@ function PopulationPlot({ population, round, transform, center, spread, virtual 
   const top = 42;
   const bottom = 376;
   const convert = (value) => transform === "raw" ? value : transform === "center" ? value - center : (value - center) / spread;
-  const rawRange = [-0.5, 10.5];
+  const rawRange = virtual ? [center - spread * 4, center + spread * 4] : [-0.5, 10.5];
   const range = [convert(rawRange[0]), convert(rawRange[1])];
-  const axisTicks = transform === "raw" ? Array.from({ length: 11 }, (_, value) => value) : ticks(range[0], range[1]);
+  const axisTicks = !virtual && transform === "raw"
+    ? Array.from({ length: 11 }, (_, value) => value)
+    : ticks(range[0], range[1], 8);
   const rawBars = virtual
-    ? histogram(population, rawRange[0], rawRange[1], 55)
+    ? histogram(population, rawRange[0], rawRange[1], 88)
     : HAPPY_FREQUENCIES.map((count, value) => ({ x0: value - 0.38, x1: value + 0.38, count, value }));
   const bars = rawBars.map((bar) => ({ ...bar, x0: convert(bar.x0), x1: convert(bar.x1) }));
   const maxCount = Math.max(...bars.map((bar) => bar.count), 1);
@@ -131,7 +135,7 @@ function PopulationPlot({ population, round, transform, center, spread, virtual 
       {axisTicks.map((tick) => (
         <g key={tick}>
           <line x1={x(tick)} x2={x(tick)} y1={top} y2={bottom} className="happysim-grid" />
-          <text x={x(tick)} y="411" textAnchor="middle" className="happysim-tick">{transform === "raw" ? tick : tick.toFixed(2)}</text>
+          <text x={x(tick)} y="411" textAnchor="middle" className="happysim-tick">{!virtual && transform === "raw" ? tick : tick.toFixed(2)}</text>
         </g>
       ))}
       {bars.map((bar, index) => {
@@ -336,7 +340,7 @@ export default function HappinessSamplingSimulatorPage() {
       {populationMode === "unknown" ? (
         <section className="happysim-virtual-note">
           <div><strong>가상 모집단</strong><span>입력한 표본통계량을 모집단 모수의 추정값으로 사용합니다.</span></div>
-          <label>입력 평균 <input type="number" min="0" max="10" step="0.1" value={virtualMean} onChange={(event) => setVirtualMean(clamp(Number(event.target.value), 0, 10))} /></label>
+          <label>입력 평균 <input type="number" step="0.1" value={virtualMean} onChange={(event) => setVirtualMean(Number(event.target.value))} /></label>
           <label>입력 표준편차 <input type="number" min="0.1" max="5" step="0.1" value={virtualStd} onChange={(event) => setVirtualStd(clamp(Number(event.target.value), 0.1, 5))} /></label>
         </section>
       ) : null}
