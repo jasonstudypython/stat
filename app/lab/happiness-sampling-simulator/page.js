@@ -246,13 +246,13 @@ function SamplingPlot({ values, current, transform, reference, showReference, sh
 export default function HappinessSamplingSimulatorPage() {
   const [populationMode, setPopulationMode] = useState("known");
   const [virtualMean, setVirtualMean] = useState(6.67);
-  const [virtualStd, setVirtualStd] = useState(1.3);
+  const [virtualStd, setVirtualStd] = useState(0.752);
   const [sampleSize, setSampleSize] = useState(30);
   const [step, setStep] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [transform, setTransform] = useState("raw");
   const [displayMode, setDisplayMode] = useState("auto");
-  const [referenceValue, setReferenceValue] = useState(7);
+  const [referenceValue, setReferenceValue] = useState(7.67);
   const [showReference, setShowReference] = useState(true);
   const [showCurve, setShowCurve] = useState(true);
   const timerRef = useRef(null);
